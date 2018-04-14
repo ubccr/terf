@@ -36,8 +36,8 @@ func TestRoundTrip(t *testing.T) {
 	raw, _ := base64.StdEncoding.DecodeString(data)
 
 	output := new(bytes.Buffer)
-	w := NewRecordWriter(output)
-	im, err := NewImage(bytes.NewReader(raw), filename, label, id)
+	w := NewWriter(output)
+	im, err := NewImage(bytes.NewReader(raw), id, filename, label, "", "")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -58,7 +58,7 @@ func TestRoundTrip(t *testing.T) {
 
 	origRaw := example.Features.Feature["image/encoded"].Kind.(*protobuf.Feature_BytesList).BytesList.Value[0]
 
-	r := NewRecordReader(bytes.NewReader(output.Bytes()))
+	r := NewReader(bytes.NewReader(output.Bytes()))
 	for {
 		ex, err := r.Next()
 		if err == io.EOF {

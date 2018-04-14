@@ -34,24 +34,24 @@ var (
 	crc32c = crc32.MakeTable(crc32.Castagnoli)
 )
 
-// RecordWriter implements a writer for TFRecords with Example protos
-type RecordWriter struct {
+// Writer implements a writer for TFRecords with Example protos
+type Writer struct {
 	writer io.Writer
 }
 
-// NewRecordWriter returns a new RecordWriter
-func NewRecordWriter(w io.Writer) *RecordWriter {
-	return &RecordWriter{writer: w}
+// NewWriter returns a new Writer
+func NewWriter(w io.Writer) *Writer {
+	return &Writer{writer: w}
 }
 
 // Returns the masked CRC32C of data
-func (w *RecordWriter) checksum(data []byte) uint32 {
+func (w *Writer) checksum(data []byte) uint32 {
 	crc := crc32.Checksum(data, crc32c)
 	return ((crc >> 15) | (crc << 17)) + kMaskDelta
 }
 
 // Write writes the Example in TFRecords format
-func (w *RecordWriter) Write(ex *protobuf.Example) error {
+func (w *Writer) Write(ex *protobuf.Example) error {
 	// Format of a single record:
 	//  uint64    length
 	//  uint32    masked crc of length

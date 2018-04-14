@@ -25,7 +25,6 @@ import (
 	"image/jpeg"
 	"io"
 	"os"
-	"path"
 
 	protobuf "github.com/ubccr/terf/protobuf"
 
@@ -39,15 +38,17 @@ const (
 	Format     = "JPEG"
 )
 
-// ImageRecord
-type ImageRecord struct {
+// Image is an Example image for training/validating in Tensorflow
+type Image struct {
 	image.Image
 
-	Width     int
-	Height    int
-	LabelID   int
-	LabelText string
-	Filename  string
+	Width        int
+	Height       int
+	LabelID      int
+	LabelText    string
+	LabelRaw     string
+	Organization string
+	Filename     string
 }
 
 // RGBImage is a JPEG encoded image in the RGB colorspace
@@ -55,20 +56,22 @@ type RGBImage struct {
 	img image.Image
 }
 
-// NewImage returns a new ImageRecord. r is the io.Reader for the raw image data,
+// NewImage returns a new Image. r is the io.Reader for the raw image data,
 // filename is the name of the file, labelText is the label, and labelID is the
 // integer identifier of the label
-func NewImage(r io.Reader, filename, labelText string, labelID int) (*ImageRecord, error) {
+func NewImage(r io.Reader, labelID int, filename, labelText, labelRaw, org string) (*Image, error) {
 	im, _, err := image.Decode(r)
 	if err != nil {
 		return nil, err
 	}
 
-	rimg := &ImageRecord{
-		Image:     im,
-		LabelText: labelText,
-		LabelID:   labelID,
-		Filename:  filename,
+	rimg := &Image{
+		Image:        im,
+		LabelID:      labelID,
+		LabelText:    labelText,
+		LabelRaw:     labelRaw,
+		Organization: org,
+		Filename:     filename,
 	}
 
 	b := im.Bounds()
@@ -78,18 +81,8 @@ func NewImage(r io.Reader, filename, labelText string, labelID int) (*ImageRecor
 	return rimg, nil
 }
 
-// NewImageFromFile returns a new ImageRecord from a file
-func NewImageFromFile(filename, labelText string, labelID int) (*ImageRecord, error) {
-	file, err := os.Open(filename)
-	if err != nil {
-		return nil, err
-	}
-
-	return NewImage(file, path.Base(filename), labelText, labelID)
-}
-
-// NewImageFromExample returns a new ImageRecord from a Tensorflow example
-func NewImageFromExample(example *protobuf.Example) (*ImageRecord, error) {
+// NewImageFromExample returns a new Image from a Tensorflow example
+func NewImageFromExample(example *protobuf.Example) (*Image, error) {
 	// TODO handle errors if feature key does not exist or is wrong type
 	raw := example.Features.Feature["image/encoded"].Kind.(*protobuf.Feature_BytesList).BytesList.Value[0]
 
@@ -99,13 +92,16 @@ func NewImageFromExample(example *protobuf.Example) (*ImageRecord, error) {
 	}
 
 	// TODO handle errors if feature key does not exist or is wrong type
-	rimg := &ImageRecord{
-		Image:     im,
-		LabelText: string(example.Features.Feature["image/class/text"].Kind.(*protobuf.Feature_BytesList).BytesList.Value[0]),
-		LabelID:   int(example.Features.Feature["image/class/label"].Kind.(*protobuf.Feature_Int64List).Int64List.Value[0]),
-		Filename:  string(example.Features.Feature["image/filename"].Kind.(*protobuf.Feature_BytesList).BytesList.Value[0]),
-		Height:    int(example.Features.Feature["image/height"].Kind.(*protobuf.Feature_Int64List).Int64List.Value[0]),
-		Width:     int(example.Features.Feature["image/width"].Kind.(*protobuf.Feature_Int64List).Int64List.Value[0]),
+	// TODO make organization optional?
+	rimg := &Image{
+		Image:        im,
+		LabelID:      int(example.Features.Feature["image/class/label"].Kind.(*protobuf.Feature_Int64List).Int64List.Value[0]),
+		LabelText:    string(example.Features.Feature["image/class/text"].Kind.(*protobuf.Feature_BytesList).BytesList.Value[0]),
+		LabelRaw:     string(example.Features.Feature["image/class/raw"].Kind.(*protobuf.Feature_BytesList).BytesList.Value[0]),
+		Filename:     string(example.Features.Feature["image/filename"].Kind.(*protobuf.Feature_BytesList).BytesList.Value[0]),
+		Organization: string(example.Features.Feature["image/org"].Kind.(*protobuf.Feature_BytesList).BytesList.Value[0]),
+		Height:       int(example.Features.Feature["image/height"].Kind.(*protobuf.Feature_Int64List).Int64List.Value[0]),
+		Width:        int(example.Features.Feature["image/width"].Kind.(*protobuf.Feature_Int64List).Int64List.Value[0]),
 	}
 
 	b := im.Bounds()
@@ -133,7 +129,7 @@ func (i *RGBImage) At(x, y int) color.Color {
 	return color.NRGBAModel.Convert(i.img.At(x, y))
 }
 
-func (i *ImageRecord) int64Feature(val int64) *protobuf.Feature {
+func (i *Image) int64Feature(val int64) *protobuf.Feature {
 	return &protobuf.Feature{
 		Kind: &protobuf.Feature_Int64List{
 			Int64List: &protobuf.Int64List{
@@ -143,7 +139,7 @@ func (i *ImageRecord) int64Feature(val int64) *protobuf.Feature {
 	}
 }
 
-func (i *ImageRecord) floatFeature(val float32) *protobuf.Feature {
+func (i *Image) floatFeature(val float32) *protobuf.Feature {
 	return &protobuf.Feature{
 		Kind: &protobuf.Feature_FloatList{
 			FloatList: &protobuf.FloatList{
@@ -153,7 +149,7 @@ func (i *ImageRecord) floatFeature(val float32) *protobuf.Feature {
 	}
 }
 
-func (i *ImageRecord) bytesFeature(val []byte) *protobuf.Feature {
+func (i *Image) bytesFeature(val []byte) *protobuf.Feature {
 	return &protobuf.Feature{
 		Kind: &protobuf.Feature_BytesList{
 			BytesList: &protobuf.BytesList{
@@ -163,9 +159,9 @@ func (i *ImageRecord) bytesFeature(val []byte) *protobuf.Feature {
 	}
 }
 
-// ToExample converts the ImageRecord to a Tensorflow Example converting the
+// ToExample converts the Image to a Tensorflow Example converting the
 // raw image to JPEG format in RGB colorspace
-func (i *ImageRecord) ToExample() (*protobuf.Example, error) {
+func (i *Image) ToExample() (*protobuf.Example, error) {
 
 	// Convert image to RGB JPEG
 	buf := new(bytes.Buffer)
@@ -183,21 +179,23 @@ func (i *ImageRecord) ToExample() (*protobuf.Example, error) {
 				"image/channels":    i.int64Feature(Channels),
 				"image/class/label": i.int64Feature(int64(i.LabelID)),
 				"image/class/text":  i.bytesFeature([]byte(i.LabelText)),
+				"image/class/raw":   i.bytesFeature([]byte(i.LabelRaw)),
 				"image/format":      i.bytesFeature([]byte(Format)),
 				"image/filename":    i.bytesFeature([]byte(i.Filename)),
+				"image/org":         i.bytesFeature([]byte(i.Organization)),
 				"image/encoded":     i.bytesFeature(buf.Bytes()),
 			},
 		},
 	}, nil
 }
 
-// Write writes the ImageRecord in JPEG format to w
-func (i *ImageRecord) Write(w io.Writer) error {
+// Write writes the Image in JPEG format to w
+func (i *Image) Write(w io.Writer) error {
 	return jpeg.Encode(w, i, nil)
 }
 
-// Save writes the ImageRecord in JPEG format to a file
-func (i *ImageRecord) Save(file string) error {
+// Save writes the Image in JPEG format to a file
+func (i *Image) Save(file string) error {
 	out, err := os.Create(file)
 	if err != nil {
 		return err

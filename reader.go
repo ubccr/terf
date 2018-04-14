@@ -27,18 +27,18 @@ import (
 	protobuf "github.com/ubccr/terf/protobuf"
 )
 
-// RecordReader implements a reader for TFRecords with Example protos
-type RecordReader struct {
+// Reader implements a reader for TFRecords with Example protos
+type Reader struct {
 	reader io.Reader
 }
 
-// NewRecordReader returns a new RecordReader
-func NewRecordReader(r io.Reader) *RecordReader {
-	return &RecordReader{reader: r}
+// NewReader returns a new Reader
+func NewReader(r io.Reader) *Reader {
+	return &Reader{reader: r}
 }
 
 // Verify checksum
-func (w *RecordReader) verifyChecksum(data []byte, crcMasked uint32) bool {
+func (w *Reader) verifyChecksum(data []byte, crcMasked uint32) bool {
 	rot := crcMasked - kMaskDelta
 	unmaskedCrc := ((rot >> 17) | (rot << 15))
 
@@ -48,7 +48,7 @@ func (w *RecordReader) verifyChecksum(data []byte, crcMasked uint32) bool {
 }
 
 // Next reads the next Example from the TFRecords input
-func (r *RecordReader) Next() (*protobuf.Example, error) {
+func (r *Reader) Next() (*protobuf.Example, error) {
 	header := make([]byte, 12)
 	_, err := io.ReadFull(r.reader, header)
 	if err != nil {
