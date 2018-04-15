@@ -48,13 +48,12 @@ func main() {
 				&cli.StringFlag{Name: "input,i", Usage: "Path to input file"},
 				&cli.StringFlag{Name: "outdir,o", Usage: "Path to outdir file"},
 				&cli.StringFlag{Name: "name,l", Usage: "Name"},
-				&cli.IntFlag{Name: "num,n", Usage: "Num per batch"},
-				&cli.IntFlag{Name: "size,s", Usage: "Total images"},
+				&cli.IntFlag{Name: "size,n", Usage: "Number of examples per batch"},
 				&cli.IntFlag{Name: "threads,t", Usage: "Num threads"},
 				&cli.BoolFlag{Name: "compress,z", Usage: "Use zlib compression"},
 			},
 			Action: func(c *cli.Context) error {
-				err := Batch(c.String("input"), c.String("outdir"), c.String("name"), c.Int("num"), c.Int("size"), c.Int("threads"), c.Bool("compress"))
+				err := Batch(c.String("input"), c.String("outdir"), c.String("name"), c.Int("size"), c.Int("threads"), c.Bool("compress"))
 				if err != nil {
 					log.Fatal(err)
 					return cli.NewExitError(err, 1)

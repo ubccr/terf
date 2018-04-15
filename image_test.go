@@ -37,7 +37,7 @@ func TestRoundTrip(t *testing.T) {
 
 	output := new(bytes.Buffer)
 	w := NewWriter(output)
-	im, err := NewImage(bytes.NewReader(raw), id, filename, label, "", "")
+	im, err := NewImage(bytes.NewReader(raw), id, filename, label, "")
 	if err != nil {
 		t.Fatal(err)
 	}

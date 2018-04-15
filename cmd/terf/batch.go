@@ -18,6 +18,7 @@
 package main
 
 import (
+	"bytes"
 	"compress/zlib"
 	"context"
 	"encoding/csv"
@@ -39,7 +40,6 @@ type ImageRecord struct {
 	Path         string
 	LabelID      int
 	LabelText    string
-	LabelRaw     string
 	Organization string
 }
 
@@ -64,7 +64,7 @@ func (s *Shard) Next() *Shard {
 }
 
 func (i *ImageRecord) FromRow(row []string) error {
-	// Format: image_path,label_id,label_text,label_raw,organization
+	// Format: image_path,label_id,label_text,organization
 	id, err := strconv.Atoi(row[1])
 	if err != nil {
 		return err
@@ -72,16 +72,31 @@ func (i *ImageRecord) FromRow(row []string) error {
 	i.Path = row[0]
 	i.LabelID = id
 	i.LabelText = row[2]
-	i.LabelRaw = row[3]
-	i.Organization = row[4]
+	i.Organization = row[3]
 
 	return nil
 }
 
-func Batch(infile, outdir, name string, numPerBatch, total, threads int, compress bool) error {
-	if total == 0 {
-		return errors.New("Please provide the number of images to process")
+func lineCounter(r io.Reader) (int, error) {
+	buf := make([]byte, 32*1024)
+	count := 0
+	lineSep := []byte{'\n'}
+
+	for {
+		c, err := r.Read(buf)
+		count += bytes.Count(buf[:c], lineSep)
+
+		switch {
+		case err == io.EOF:
+			return count, nil
+
+		case err != nil:
+			return count, err
+		}
 	}
+}
+
+func Batch(infile, outdir, name string, numPerBatch, threads int, compress bool) error {
 	if len(outdir) == 0 {
 		cwd, err := os.Getwd()
 		if err != nil {
@@ -102,18 +117,30 @@ func Batch(infile, outdir, name string, numPerBatch, total, threads int, compres
 		numPerBatch = 1024
 	}
 
-	if numPerBatch > total {
-		total = 1
-	} else {
-		total = int(math.Ceil(float64(total) / float64(numPerBatch)))
-	}
-
 	in, err := os.Open(infile)
 	if err != nil {
 		return err
 	}
 	defer in.Close()
 
+	total, err := lineCounter(in)
+	if err != nil {
+		return err
+	}
+
+	// Header row is required
+	total--
+	if total <= 0 {
+		return errors.New("No lines found")
+	}
+
+	if numPerBatch > total {
+		total = 1
+	} else {
+		total = int(math.Ceil(float64(total) / float64(numPerBatch)))
+	}
+
+	in.Seek(0, 0)
 	r := csv.NewReader(in)
 
 	// Parse header info
@@ -223,7 +250,7 @@ func process(ctx context.Context, shards <-chan *Shard) error {
 				continue
 			}
 
-			img, err := terf.NewImage(fh, ir.LabelID, path.Base(ir.Path), ir.LabelText, ir.LabelRaw, ir.Organization)
+			img, err := terf.NewImage(fh, ir.LabelID, path.Base(ir.Path), ir.LabelText, ir.Organization)
 			if err != nil {
 				log.WithFields(log.Fields{
 					"imagePath": ir.Path,

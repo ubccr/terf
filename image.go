@@ -46,7 +46,6 @@ type Image struct {
 	Height       int
 	LabelID      int
 	LabelText    string
-	LabelRaw     string
 	Organization string
 	Filename     string
 }
@@ -57,9 +56,10 @@ type RGBImage struct {
 }
 
 // NewImage returns a new Image. r is the io.Reader for the raw image data,
-// filename is the name of the file, labelText is the label, and labelID is the
-// integer identifier of the label
-func NewImage(r io.Reader, labelID int, filename, labelText, labelRaw, org string) (*Image, error) {
+// filename is the name of the file, labelText is the label, labelID is the
+// integer identifier of the label, and org is the organization that produced
+// the image
+func NewImage(r io.Reader, labelID int, filename, labelText, org string) (*Image, error) {
 	im, _, err := image.Decode(r)
 	if err != nil {
 		return nil, err
@@ -69,7 +69,6 @@ func NewImage(r io.Reader, labelID int, filename, labelText, labelRaw, org strin
 		Image:        im,
 		LabelID:      labelID,
 		LabelText:    labelText,
-		LabelRaw:     labelRaw,
 		Organization: org,
 		Filename:     filename,
 	}
@@ -97,7 +96,6 @@ func NewImageFromExample(example *protobuf.Example) (*Image, error) {
 		Image:        im,
 		LabelID:      int(example.Features.Feature["image/class/label"].Kind.(*protobuf.Feature_Int64List).Int64List.Value[0]),
 		LabelText:    string(example.Features.Feature["image/class/text"].Kind.(*protobuf.Feature_BytesList).BytesList.Value[0]),
-		LabelRaw:     string(example.Features.Feature["image/class/raw"].Kind.(*protobuf.Feature_BytesList).BytesList.Value[0]),
 		Filename:     string(example.Features.Feature["image/filename"].Kind.(*protobuf.Feature_BytesList).BytesList.Value[0]),
 		Organization: string(example.Features.Feature["image/org"].Kind.(*protobuf.Feature_BytesList).BytesList.Value[0]),
 		Height:       int(example.Features.Feature["image/height"].Kind.(*protobuf.Feature_Int64List).Int64List.Value[0]),
@@ -179,7 +177,6 @@ func (i *Image) ToExample() (*protobuf.Example, error) {
 				"image/channels":    i.int64Feature(Channels),
 				"image/class/label": i.int64Feature(int64(i.LabelID)),
 				"image/class/text":  i.bytesFeature([]byte(i.LabelText)),
-				"image/class/raw":   i.bytesFeature([]byte(i.LabelRaw)),
 				"image/format":      i.bytesFeature([]byte(Format)),
 				"image/filename":    i.bytesFeature([]byte(i.Filename)),
 				"image/org":         i.bytesFeature([]byte(i.Organization)),
