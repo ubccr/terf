@@ -244,7 +244,7 @@ func extractFile(inputPath, outdir string, compress bool) ([]*ImageRecord, error
 			return nil, err
 		}
 
-		if err := os.Mkdir(filepath.Join(outdir, img.LabelText), 0755); err != nil {
+		if err := os.MkdirAll(filepath.Join(outdir, img.LabelText), 0755); err != nil {
 			return nil, err
 		}
 
