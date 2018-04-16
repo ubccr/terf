@@ -113,7 +113,7 @@ func lineCounter(r io.Reader) (int, error) {
 
 }
 
-func Batch(infile, outdir, name string, numPerBatch, threads int, compress bool) error {
+func Build(infile, outdir, name string, numPerBatch, threads int, compress bool) error {
 	if len(outdir) == 0 {
 		cwd, err := os.Getwd()
 		if err != nil {
@@ -221,7 +221,23 @@ func Batch(infile, outdir, name string, numPerBatch, threads int, compress bool)
 	})
 
 	for i := 0; i < threads; i++ {
-		g.Go(func() error { return process(ctx, shards) })
+		g.Go(func() error {
+			for shard := range shards {
+
+				err := process(shard)
+				if err != nil {
+					return err
+				}
+
+				select {
+				default:
+				case <-ctx.Done():
+					return ctx.Err()
+				}
+			}
+
+			return nil
+		})
 	}
 
 	if err := g.Wait(); err != nil {
@@ -231,67 +247,51 @@ func Batch(infile, outdir, name string, numPerBatch, threads int, compress bool)
 	return nil
 }
 
-func process(ctx context.Context, shards <-chan *Shard) error {
-	for shard := range shards {
-		outfile := fmt.Sprintf("%s-%.5d-of-%.5d", shard.Name, shard.ID, shard.Total)
-		out, err := os.Create(path.Join(shard.BaseDir, outfile))
+func process(shard *Shard) error {
+	outfile := fmt.Sprintf("%s-%.5d-of-%.5d", shard.Name, shard.ID, shard.Total)
+
+	log.WithFields(log.Fields{
+		"file":   outfile,
+		"images": len(shard.Images),
+		"zlib":   shard.Compress,
+	}).Info("Processing shard")
+
+	out, err := os.Create(path.Join(shard.BaseDir, outfile))
+	if err != nil {
+		return err
+	}
+	defer out.Close()
+
+	var w *terf.Writer
+
+	if shard.Compress {
+		zout := zlib.NewWriter(out)
+		defer zout.Close()
+
+		w = terf.NewWriter(zout)
+	} else {
+		w = terf.NewWriter(out)
+	}
+
+	for _, ir := range shard.Images {
+		fh, err := os.Open(ir.Path)
 		if err != nil {
 			return err
 		}
-		defer out.Close()
 
-		var w *terf.Writer
-
-		if shard.Compress {
-			zout := zlib.NewWriter(out)
-			defer zout.Close()
-
-			w = terf.NewWriter(zout)
-		} else {
-			w = terf.NewWriter(out)
+		img, err := terf.NewImage(fh, ir.ID, ir.LabelID, ir.LabelText, path.Base(ir.Path), ir.Organization)
+		if err != nil {
+			return err
 		}
 
-		for _, ir := range shard.Images {
-			fh, err := os.Open(ir.Path)
-			if err != nil {
-				log.WithFields(log.Fields{
-					"imagePath": ir.Path,
-					"error":     err,
-				}).Error("Failed to open image file")
-				continue
-			}
-
-			img, err := terf.NewImage(fh, ir.ID, ir.LabelID, ir.LabelText, path.Base(ir.Path), ir.Organization)
-			if err != nil {
-				log.WithFields(log.Fields{
-					"imagePath": ir.Path,
-					"error":     err,
-				}).Error("Failed to load image file")
-				continue
-			}
-
-			ex, err := img.ToExample()
-			if err != nil {
-				log.WithFields(log.Fields{
-					"imagePath": ir.Path,
-					"error":     err,
-				}).Error("Failed to convert image to example proto")
-				continue
-			}
-
-			err = w.Write(ex)
-			if err != nil {
-				log.WithFields(log.Fields{
-					"imagePath": ir.Path,
-					"error":     err,
-				}).Error("Failed to write image")
-			}
+		ex, err := img.ToExample()
+		if err != nil {
+			return err
 		}
 
-		select {
-		default:
-		case <-ctx.Done():
-			return ctx.Err()
+		err = w.Write(ex)
+		if err != nil {
+			return err
 		}
 	}
 

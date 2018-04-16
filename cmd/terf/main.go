@@ -42,7 +42,7 @@ func main() {
 	}
 	app.Commands = []cli.Command{
 		{
-			Name:  "batch",
+			Name:  "build",
 			Usage: "Converts image data to TFRecords file format with Example protos in batch",
 			Flags: []cli.Flag{
 				&cli.StringFlag{Name: "input,i", Usage: "Path to input file"},
@@ -53,7 +53,7 @@ func main() {
 				&cli.BoolFlag{Name: "compress,z", Usage: "Use zlib compression"},
 			},
 			Action: func(c *cli.Context) error {
-				err := Batch(c.String("input"), c.String("outdir"), c.String("name"), c.Int("size"), c.Int("threads"), c.Bool("compress"))
+				err := Build(c.String("input"), c.String("outdir"), c.String("name"), c.Int("size"), c.Int("threads"), c.Bool("compress"))
 				if err != nil {
 					log.Fatal(err)
 					return cli.NewExitError(err, 1)
@@ -63,12 +63,20 @@ func main() {
 			},
 		},
 		{
-			Name:  "read",
-			Usage: "Read",
+			Name:  "summary",
+			Usage: "Display summary statistics for TFRecords file(s)",
 			Flags: []cli.Flag{
 				&cli.StringFlag{Name: "input, i", Usage: "Input file"},
+				&cli.IntFlag{Name: "threads,t", Usage: "Num threads"},
+				&cli.BoolFlag{Name: "compress,z", Usage: "Use zlib compression"},
 			},
 			Action: func(c *cli.Context) error {
+				err := Summary(c.String("input"), c.Int("threads"), c.Bool("compress"))
+				if err != nil {
+					log.Fatal(err)
+					return cli.NewExitError(err, 1)
+				}
+
 				return nil
 			},
 		}}
