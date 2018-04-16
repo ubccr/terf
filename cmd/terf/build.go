@@ -27,7 +27,7 @@ import (
 	"io"
 	"math"
 	"os"
-	"path"
+	"path/filepath"
 	"runtime"
 	"strconv"
 
@@ -256,7 +256,7 @@ func process(shard *Shard) error {
 		"zlib":   shard.Compress,
 	}).Info("Processing shard")
 
-	out, err := os.Create(path.Join(shard.BaseDir, outfile))
+	out, err := os.Create(filepath.Join(shard.BaseDir, outfile))
 	if err != nil {
 		return err
 	}
@@ -279,7 +279,7 @@ func process(shard *Shard) error {
 			return err
 		}
 
-		img, err := terf.NewImage(fh, ir.ID, ir.LabelID, ir.LabelText, path.Base(ir.Path), ir.Organization)
+		img, err := terf.NewImage(fh, ir.ID, ir.LabelID, ir.LabelText, filepath.Base(ir.Path), ir.Organization)
 		if err != nil {
 			return err
 		}

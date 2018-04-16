@@ -24,7 +24,7 @@ import (
 	"io"
 	"io/ioutil"
 	"os"
-	"path"
+	"path/filepath"
 	"runtime"
 
 	log "github.com/sirupsen/logrus"
@@ -75,7 +75,7 @@ func Summary(inputPath string, threads int, compress bool) error {
 			}
 
 			select {
-			case paths <- path.Join(inputPath, f.Name()):
+			case paths <- filepath.Join(inputPath, f.Name()):
 			case <-ctx.Done():
 				return ctx.Err()
 			}
