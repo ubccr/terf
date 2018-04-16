@@ -38,6 +38,7 @@ import (
 
 type ImageRecord struct {
 	Path         string
+	ID           int
 	LabelID      int
 	LabelText    string
 	Organization string
@@ -64,15 +65,25 @@ func (s *Shard) Next() *Shard {
 }
 
 func (i *ImageRecord) FromRow(row []string) error {
-	// Format: image_path,label_id,label_text,organization
+	// Format: image_path,id,label_id,label_text,organization
+	if len(row) != 5 {
+		return errors.New("Invalid row format")
+	}
+
 	id, err := strconv.Atoi(row[1])
 	if err != nil {
 		return err
 	}
+	lid, err := strconv.Atoi(row[2])
+	if err != nil {
+		return err
+
+	}
 	i.Path = row[0]
-	i.LabelID = id
-	i.LabelText = row[2]
-	i.Organization = row[3]
+	i.ID = id
+	i.LabelID = lid
+	i.LabelText = row[3]
+	i.Organization = row[4]
 
 	return nil
 }
@@ -88,12 +99,18 @@ func lineCounter(r io.Reader) (int, error) {
 
 		switch {
 		case err == io.EOF:
-			return count, nil
+			// Skip required header row
+			count--
+			if count <= 0 {
+				return count, errors.New("No lines found")
+			}
 
+			return count, nil
 		case err != nil:
 			return count, err
 		}
 	}
+
 }
 
 func Batch(infile, outdir, name string, numPerBatch, threads int, compress bool) error {
@@ -126,12 +143,6 @@ func Batch(infile, outdir, name string, numPerBatch, threads int, compress bool)
 	total, err := lineCounter(in)
 	if err != nil {
 		return err
-	}
-
-	// Header row is required
-	total--
-	if total <= 0 {
-		return errors.New("No lines found")
 	}
 
 	if numPerBatch > total {
@@ -250,7 +261,7 @@ func process(ctx context.Context, shards <-chan *Shard) error {
 				continue
 			}
 
-			img, err := terf.NewImage(fh, ir.LabelID, path.Base(ir.Path), ir.LabelText, ir.Organization)
+			img, err := terf.NewImage(fh, ir.ID, ir.LabelID, ir.LabelText, path.Base(ir.Path), ir.Organization)
 			if err != nil {
 				log.WithFields(log.Fields{
 					"imagePath": ir.Path,

@@ -42,6 +42,7 @@ const (
 type Image struct {
 	image.Image
 
+	ID           int
 	Width        int
 	Height       int
 	LabelID      int
@@ -55,11 +56,11 @@ type RGBImage struct {
 	img image.Image
 }
 
-// NewImage returns a new Image. r is the io.Reader for the raw image data,
-// filename is the name of the file, labelText is the label, labelID is the
-// integer identifier of the label, and org is the organization that produced
-// the image
-func NewImage(r io.Reader, labelID int, filename, labelText, org string) (*Image, error) {
+// NewImage returns a new Image. r is the io.Reader for the raw image data, id
+// is the unique identifier for the image, labelID is the integer identifier of
+// the label, labelText is the label, filename is the name of the file, and org
+// is the organization that produced the image
+func NewImage(r io.Reader, id, labelID int, labelText, filename, org string) (*Image, error) {
 	im, _, err := image.Decode(r)
 	if err != nil {
 		return nil, err
@@ -67,6 +68,7 @@ func NewImage(r io.Reader, labelID int, filename, labelText, org string) (*Image
 
 	rimg := &Image{
 		Image:        im,
+		ID:           id,
 		LabelID:      labelID,
 		LabelText:    labelText,
 		Organization: org,
@@ -94,10 +96,11 @@ func NewImageFromExample(example *protobuf.Example) (*Image, error) {
 	// TODO make organization optional?
 	rimg := &Image{
 		Image:        im,
+		ID:           int(example.Features.Feature["image/id"].Kind.(*protobuf.Feature_Int64List).Int64List.Value[0]),
 		LabelID:      int(example.Features.Feature["image/class/label"].Kind.(*protobuf.Feature_Int64List).Int64List.Value[0]),
 		LabelText:    string(example.Features.Feature["image/class/text"].Kind.(*protobuf.Feature_BytesList).BytesList.Value[0]),
 		Filename:     string(example.Features.Feature["image/filename"].Kind.(*protobuf.Feature_BytesList).BytesList.Value[0]),
-		Organization: string(example.Features.Feature["image/org"].Kind.(*protobuf.Feature_BytesList).BytesList.Value[0]),
+		Organization: string(example.Features.Feature["image/organization"].Kind.(*protobuf.Feature_BytesList).BytesList.Value[0]),
 		Height:       int(example.Features.Feature["image/height"].Kind.(*protobuf.Feature_Int64List).Int64List.Value[0]),
 		Width:        int(example.Features.Feature["image/width"].Kind.(*protobuf.Feature_Int64List).Int64List.Value[0]),
 	}
@@ -171,16 +174,17 @@ func (i *Image) ToExample() (*protobuf.Example, error) {
 	return &protobuf.Example{
 		Features: &protobuf.Features{
 			Feature: map[string]*protobuf.Feature{
-				"image/height":      i.int64Feature(int64(i.Height)),
-				"image/width":       i.int64Feature(int64(i.Width)),
-				"image/colorspace":  i.bytesFeature([]byte(ColorSpace)),
-				"image/channels":    i.int64Feature(Channels),
-				"image/class/label": i.int64Feature(int64(i.LabelID)),
-				"image/class/text":  i.bytesFeature([]byte(i.LabelText)),
-				"image/format":      i.bytesFeature([]byte(Format)),
-				"image/filename":    i.bytesFeature([]byte(i.Filename)),
-				"image/org":         i.bytesFeature([]byte(i.Organization)),
-				"image/encoded":     i.bytesFeature(buf.Bytes()),
+				"image/height":       i.int64Feature(int64(i.Height)),
+				"image/width":        i.int64Feature(int64(i.Width)),
+				"image/colorspace":   i.bytesFeature([]byte(ColorSpace)),
+				"image/channels":     i.int64Feature(Channels),
+				"image/class/label":  i.int64Feature(int64(i.LabelID)),
+				"image/class/text":   i.bytesFeature([]byte(i.LabelText)),
+				"image/format":       i.bytesFeature([]byte(Format)),
+				"image/filename":     i.bytesFeature([]byte(i.Filename)),
+				"image/id":           i.int64Feature(int64(i.ID)),
+				"image/organization": i.bytesFeature([]byte(i.Organization)),
+				"image/encoded":      i.bytesFeature(buf.Bytes()),
 			},
 		},
 	}, nil
