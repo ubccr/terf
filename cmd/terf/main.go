@@ -63,6 +63,25 @@ func main() {
 			},
 		},
 		{
+			Name:  "extract",
+			Usage: "Extract image data from TFRecords file format with Example protos to outdir",
+			Flags: []cli.Flag{
+				&cli.StringFlag{Name: "input,i", Usage: "Path to input"},
+				&cli.StringFlag{Name: "outdir,o", Usage: "Path to outdir"},
+				&cli.IntFlag{Name: "threads,t", Usage: "Num threads"},
+				&cli.BoolFlag{Name: "compress,z", Usage: "Use zlib compression"},
+			},
+			Action: func(c *cli.Context) error {
+				err := Extract(c.String("input"), c.String("outdir"), c.Int("threads"), c.Bool("compress"))
+				if err != nil {
+					log.Fatal(err)
+					return cli.NewExitError(err, 1)
+				}
+
+				return nil
+			},
+		},
+		{
 			Name:  "summary",
 			Usage: "Display summary statistics for TFRecords file(s)",
 			Flags: []cli.Flag{
