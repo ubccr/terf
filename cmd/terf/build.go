@@ -89,6 +89,11 @@ func Build(infile, outdir, name string, numPerBatch, threads int, compress bool)
 		outdir = cwd
 	}
 
+	err := os.MkdirAll(outdir, 0755)
+	if err != nil {
+		return err
+	}
+
 	if threads == 0 {
 		threads = runtime.NumCPU()
 	}
