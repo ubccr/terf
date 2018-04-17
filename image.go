@@ -89,9 +89,9 @@ func (i *RGBImage) At(x, y int) color.Color {
 	return color.NRGBAModel.Convert(i.img.At(x, y))
 }
 
-// int64Feature is a helper function for encoding Tensorflow Example proto
+// Int64Feature is a helper function for encoding Tensorflow Example proto
 // Int64 features
-func (i *Image) int64Feature(val int64) *protobuf.Feature {
+func Int64Feature(val int64) *protobuf.Feature {
 	return &protobuf.Feature{
 		Kind: &protobuf.Feature_Int64List{
 			Int64List: &protobuf.Int64List{
@@ -101,9 +101,9 @@ func (i *Image) int64Feature(val int64) *protobuf.Feature {
 	}
 }
 
-// floatFeature is a helper function for encoding Tensorflow Example proto
+// FloatFeature is a helper function for encoding Tensorflow Example proto
 // Float features
-func (i *Image) floatFeature(val float32) *protobuf.Feature {
+func FloatFeature(val float32) *protobuf.Feature {
 	return &protobuf.Feature{
 		Kind: &protobuf.Feature_FloatList{
 			FloatList: &protobuf.FloatList{
@@ -113,9 +113,9 @@ func (i *Image) floatFeature(val float32) *protobuf.Feature {
 	}
 }
 
-// bytesFeature is a helper function for encoding Tensorflow Example proto
+// BytesFeature is a helper function for encoding Tensorflow Example proto
 // Bytes features
-func (i *Image) bytesFeature(val []byte) *protobuf.Feature {
+func BytesFeature(val []byte) *protobuf.Feature {
 	return &protobuf.Feature{
 		Kind: &protobuf.Feature_BytesList{
 			BytesList: &protobuf.BytesList{
@@ -123,6 +123,57 @@ func (i *Image) bytesFeature(val []byte) *protobuf.Feature {
 			},
 		},
 	}
+}
+
+// ExampleFeatureInt64 is a helper function for decoding proto Int64 feature
+// from a Tensorflow Example. If key is not found it returns default value
+func ExampleFeatureInt64(example *protobuf.Example, key string) int {
+	// TODO: return error if key is not found?
+	f, ok := example.Features.Feature[key]
+	if !ok {
+		return 0
+	}
+
+	val, ok := f.Kind.(*protobuf.Feature_Int64List)
+	if !ok {
+		return 0
+	}
+
+	return int(val.Int64List.Value[0])
+}
+
+// ExampleFeatureFloat is a helper function for decoding proto Float feature
+// from a Tensorflow Example. If key is not found it returns default value
+func ExampleFeatureFloat(example *protobuf.Example, key string) float64 {
+	// TODO: return error if key is not found?
+	f, ok := example.Features.Feature[key]
+	if !ok {
+		return 0
+	}
+
+	val, ok := f.Kind.(*protobuf.Feature_FloatList)
+	if !ok {
+		return 0
+	}
+
+	return float64(val.FloatList.Value[0])
+}
+
+// ExampleFeatureBytes is a helper function for decoding proto Bytes feature
+// from a Tensorflow Example. If key is not found it returns default value
+func ExampleFeatureBytes(example *protobuf.Example, key string) []byte {
+	// TODO: return error if key is not found?
+	f, ok := example.Features.Feature[key]
+	if !ok {
+		return nil
+	}
+
+	val, ok := f.Kind.(*protobuf.Feature_BytesList)
+	if !ok {
+		return nil
+	}
+
+	return val.BytesList.Value[0]
 }
 
 // NewImage returns a new Image. r is the io.Reader for the raw image data, id
@@ -237,25 +288,23 @@ func (i *Image) MarshalCSV(baseDir string) []string {
 // UnmarshalExample decodes data from a Tensorflow example proto into Image i.
 // This is the inverse of MarshalExample.
 func (i *Image) UnmarshalExample(example *protobuf.Example) error {
-	// TODO handle errors if feature key does not exist or is wrong type
-	raw := example.Features.Feature["image/encoded"].Kind.(*protobuf.Feature_BytesList).BytesList.Value[0]
+	raw := ExampleFeatureBytes(example, "image/encoded")
 
 	im, _, err := image.Decode(bytes.NewReader(raw))
 	if err != nil {
 		return err
 	}
 
-	// TODO handle errors if feature keys do not exist or is wrong type
 	// TODO make features optional? or configurable?
 	i.Image = im
-	i.ID = int(example.Features.Feature["image/id"].Kind.(*protobuf.Feature_Int64List).Int64List.Value[0])
-	i.Height = int(example.Features.Feature["image/height"].Kind.(*protobuf.Feature_Int64List).Int64List.Value[0])
-	i.Width = int(example.Features.Feature["image/width"].Kind.(*protobuf.Feature_Int64List).Int64List.Value[0])
-	i.LabelID = int(example.Features.Feature["image/class/label"].Kind.(*protobuf.Feature_Int64List).Int64List.Value[0])
-	i.LabelRaw = int(example.Features.Feature["image/class/raw"].Kind.(*protobuf.Feature_Int64List).Int64List.Value[0])
-	i.LabelText = string(example.Features.Feature["image/class/text"].Kind.(*protobuf.Feature_BytesList).BytesList.Value[0])
-	i.SourceID = int(example.Features.Feature["image/class/source"].Kind.(*protobuf.Feature_Int64List).Int64List.Value[0])
-	i.Filename = string(example.Features.Feature["image/filename"].Kind.(*protobuf.Feature_BytesList).BytesList.Value[0])
+	i.ID = ExampleFeatureInt64(example, "image/id")
+	i.Height = ExampleFeatureInt64(example, "image/height")
+	i.Width = ExampleFeatureInt64(example, "image/width")
+	i.LabelID = ExampleFeatureInt64(example, "image/class/label")
+	i.LabelRaw = ExampleFeatureInt64(example, "image/class/raw")
+	i.LabelText = string(ExampleFeatureBytes(example, "image/class/text"))
+	i.SourceID = ExampleFeatureInt64(example, "image/class/source")
+	i.Filename = string(ExampleFeatureBytes(example, "image/filename"))
 
 	b := im.Bounds()
 
@@ -298,18 +347,18 @@ func (i *Image) MarshalExample() (*protobuf.Example, error) {
 	return &protobuf.Example{
 		Features: &protobuf.Features{
 			Feature: map[string]*protobuf.Feature{
-				"image/height":       i.int64Feature(int64(i.Height)),
-				"image/width":        i.int64Feature(int64(i.Width)),
-				"image/colorspace":   i.bytesFeature([]byte(ColorSpace)),
-				"image/channels":     i.int64Feature(Channels),
-				"image/class/label":  i.int64Feature(int64(i.LabelID)),
-				"image/class/raw":    i.int64Feature(int64(i.LabelRaw)),
-				"image/class/source": i.int64Feature(int64(i.SourceID)),
-				"image/class/text":   i.bytesFeature([]byte(i.LabelText)),
-				"image/format":       i.bytesFeature([]byte(Format)),
-				"image/filename":     i.bytesFeature([]byte(i.Filename)),
-				"image/id":           i.int64Feature(int64(i.ID)),
-				"image/encoded":      i.bytesFeature(buf.Bytes()),
+				"image/height":       Int64Feature(int64(i.Height)),
+				"image/width":        Int64Feature(int64(i.Width)),
+				"image/colorspace":   BytesFeature([]byte(ColorSpace)),
+				"image/channels":     Int64Feature(Channels),
+				"image/class/label":  Int64Feature(int64(i.LabelID)),
+				"image/class/raw":    Int64Feature(int64(i.LabelRaw)),
+				"image/class/source": Int64Feature(int64(i.SourceID)),
+				"image/class/text":   BytesFeature([]byte(i.LabelText)),
+				"image/format":       BytesFeature([]byte(Format)),
+				"image/filename":     BytesFeature([]byte(i.Filename)),
+				"image/id":           Int64Feature(int64(i.ID)),
+				"image/encoded":      BytesFeature(buf.Bytes()),
 			},
 		},
 	}, nil
