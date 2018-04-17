@@ -175,10 +175,11 @@ func Extract(inputPath, outPath string, threads int, compress bool) error {
 func writeHeader(w *csv.Writer) error {
 	header := []string{
 		"image_path",
-		"id",
+		"image_id",
 		"label_id",
 		"label_text",
-		"organization",
+		"label_raw",
+		"source",
 	}
 
 	return w.Write(header)

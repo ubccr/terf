@@ -67,7 +67,7 @@ func (s *Stats) Add(from *Stats) {
 
 func (s *Stats) Print() {
 	fmt.Printf("Total: %d\n", s.Total)
-	fmt.Printf("Labels: \n")
+	fmt.Printf("Label: \n")
 	for key, val := range s.LabelText {
 		fmt.Printf("    - %s: %d\n", key, val)
 	}
@@ -75,6 +75,20 @@ func (s *Stats) Print() {
 	if len(s.Source) > 0 {
 		fmt.Printf("Source: \n")
 		for key, val := range s.Source {
+			fmt.Printf("    - %d: %d\n", key, val)
+		}
+	}
+
+	if len(s.LabelID) > 0 {
+		fmt.Printf("Label ID: \n")
+		for key, val := range s.LabelID {
+			fmt.Printf("    - %d: %d\n", key, val)
+		}
+	}
+
+	if len(s.LabelRaw) > 0 {
+		fmt.Printf("Label Raw: \n")
+		for key, val := range s.LabelRaw {
 			fmt.Printf("    - %d: %d\n", key, val)
 		}
 	}
