@@ -29,6 +29,7 @@ import (
 
 	log "github.com/sirupsen/logrus"
 	"github.com/ubccr/terf"
+	protobuf "github.com/ubccr/terf/protobuf"
 	"golang.org/x/sync/errgroup"
 )
 
@@ -215,19 +216,17 @@ func fileSummary(inputPath string, compress bool) (*Stats, error) {
 			return nil, err
 		}
 
-		img := &terf.Image{}
-		err = img.UnmarshalExample(ex)
-		if err != nil {
-			return nil, err
-		}
+		// TODO handle errors if feature keys do not exist
+		labelID := int(ex.Features.Feature["image/class/label"].Kind.(*protobuf.Feature_Int64List).Int64List.Value[0])
+		labelRaw := int(ex.Features.Feature["image/class/raw"].Kind.(*protobuf.Feature_Int64List).Int64List.Value[0])
+		labelText := string(ex.Features.Feature["image/class/text"].Kind.(*protobuf.Feature_BytesList).BytesList.Value[0])
+		sourceID := int(ex.Features.Feature["image/class/source"].Kind.(*protobuf.Feature_Int64List).Int64List.Value[0])
 
 		stats.Total++
-		if len(img.LabelText) > 0 {
-			stats.LabelText[img.LabelText]++
-		}
-		stats.LabelID[img.LabelID]++
-		stats.LabelRaw[img.LabelRaw]++
-		stats.Source[img.SourceID]++
+		stats.LabelText[labelText]++
+		stats.LabelID[labelID]++
+		stats.LabelRaw[labelRaw]++
+		stats.Source[sourceID]++
 	}
 
 	return stats, nil
