@@ -31,15 +31,16 @@ func TestRoundTrip(t *testing.T) {
 	id := 1234
 	label := "Crystal"
 	labelID := 1
+	labelRaw := 2
+	sourceID := 104
 	width := 150
 	height := 103
-	org := "acme"
 
 	raw, _ := base64.StdEncoding.DecodeString(data)
 
 	output := new(bytes.Buffer)
 	w := NewWriter(output)
-	im, err := NewImage(bytes.NewReader(raw), id, labelID, label, filename, org)
+	im, err := NewImage(bytes.NewReader(raw), id, labelID, labelRaw, label, filename, sourceID)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -78,9 +79,6 @@ func TestRoundTrip(t *testing.T) {
 		if id != img.ID {
 			t.Errorf("Incorrect id: got %d should be %d", img.ID, id)
 		}
-		if org != img.Organization {
-			t.Errorf("Incorrect org: got %s should be %s", img.Organization, org)
-		}
 		if filename != img.Filename {
 			t.Errorf("Incorrect filename: got %s should be %s", img.Filename, filename)
 		}
@@ -90,7 +88,12 @@ func TestRoundTrip(t *testing.T) {
 		if labelID != img.LabelID {
 			t.Errorf("Incorrect id: got %d should be %d", img.LabelID, labelID)
 		}
-
+		if labelRaw != img.LabelRaw {
+			t.Errorf("Incorrect labelRaw: got %d should be %d", img.LabelRaw, labelRaw)
+		}
+		if sourceID != img.SourceID {
+			t.Errorf("Incorrect source: got %d should be %d", img.SourceID, sourceID)
+		}
 		if width != img.Width {
 			t.Errorf("Incorrect width: got %d should be %d", img.Width, width)
 		}

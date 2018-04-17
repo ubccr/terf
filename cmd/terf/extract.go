@@ -22,13 +22,11 @@ import (
 	"context"
 	"encoding/csv"
 	"errors"
-	"fmt"
 	"io"
 	"io/ioutil"
 	"os"
 	"path/filepath"
 	"runtime"
-	"strconv"
 
 	log "github.com/sirupsen/logrus"
 	"github.com/ubccr/terf"
@@ -85,7 +83,7 @@ func Extract(inputPath, outPath string, threads int, compress bool) error {
 			return err
 		}
 
-		writeLabels(w, images)
+		writeLabels(w, outdir, images)
 
 		w.Flush()
 		if err := w.Error(); err != nil {
@@ -120,7 +118,7 @@ func Extract(inputPath, outPath string, threads int, compress bool) error {
 		return nil
 	})
 
-	images := make(chan []*ImageRecord)
+	images := make(chan []*terf.Image)
 
 	for i := 0; i < threads; i++ {
 		g.Go(func() error {
@@ -159,7 +157,7 @@ func Extract(inputPath, outPath string, threads int, compress bool) error {
 	}
 
 	for i := range images {
-		writeLabels(w, i)
+		writeLabels(w, outdir, i)
 	}
 
 	if err := g.Wait(); err != nil {
@@ -186,17 +184,9 @@ func writeHeader(w *csv.Writer) error {
 	return w.Write(header)
 }
 
-func writeLabels(w *csv.Writer, images []*ImageRecord) error {
+func writeLabels(w *csv.Writer, outdir string, images []*terf.Image) error {
 	for _, i := range images {
-		record := []string{
-			i.Path,
-			strconv.Itoa(i.ID),
-			strconv.Itoa(i.LabelID),
-			i.LabelText,
-			i.Organization,
-		}
-
-		if err := w.Write(record); err != nil {
+		if err := w.Write(i.MarshalCSV(outdir)); err != nil {
 			return err
 		}
 	}
@@ -204,7 +194,7 @@ func writeLabels(w *csv.Writer, images []*ImageRecord) error {
 	return nil
 }
 
-func extractFile(inputPath, outdir string, compress bool) ([]*ImageRecord, error) {
+func extractFile(inputPath, outdir string, compress bool) ([]*terf.Image, error) {
 	log.WithFields(log.Fields{
 		"path": inputPath,
 		"zlib": compress,
@@ -229,7 +219,7 @@ func extractFile(inputPath, outdir string, compress bool) ([]*ImageRecord, error
 		r = terf.NewReader(in)
 	}
 
-	images := make([]*ImageRecord, 0)
+	images := make([]*terf.Image, 0)
 
 	for {
 		ex, err := r.Next()
@@ -245,26 +235,18 @@ func extractFile(inputPath, outdir string, compress bool) ([]*ImageRecord, error
 			return nil, err
 		}
 
-		if err := os.MkdirAll(filepath.Join(outdir, img.LabelText), 0755); err != nil {
+		fname := filepath.Join(outdir, img.Name())
+
+		if err := os.MkdirAll(filepath.Dir(fname), 0755); err != nil {
 			return nil, err
 		}
-
-		fname := filepath.Join(outdir, img.LabelText, fmt.Sprintf("%d.jpg", img.ID))
 
 		err = img.Save(fname)
 		if err != nil {
 			return nil, err
 		}
 
-		ir := &ImageRecord{
-			Path:         fname,
-			ID:           img.ID,
-			LabelID:      img.LabelID,
-			LabelText:    img.LabelText,
-			Organization: img.Organization,
-		}
-
-		images = append(images, ir)
+		images = append(images, img)
 	}
 
 	return images, nil

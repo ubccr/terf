@@ -33,9 +33,51 @@ import (
 )
 
 type Stats struct {
-	Total  int
-	Orgs   map[string]int
-	Labels map[string]int
+	Total     int
+	Source    map[int]int
+	LabelID   map[int]int
+	LabelRaw  map[int]int
+	LabelText map[string]int
+}
+
+func NewStats() *Stats {
+	return &Stats{
+		Source:    make(map[int]int),
+		LabelID:   make(map[int]int),
+		LabelRaw:  make(map[int]int),
+		LabelText: make(map[string]int),
+	}
+}
+
+func (s *Stats) Add(from *Stats) {
+	s.Total += from.Total
+	for key, val := range from.Source {
+		s.Source[key] += val
+	}
+	for key, val := range from.LabelID {
+		s.LabelID[key] += val
+	}
+	for key, val := range from.LabelRaw {
+		s.LabelRaw[key] += val
+	}
+	for key, val := range from.LabelText {
+		s.LabelText[key] += val
+	}
+}
+
+func (s *Stats) Print() {
+	fmt.Printf("Total: %d\n", s.Total)
+	fmt.Printf("Labels: \n")
+	for key, val := range s.LabelText {
+		fmt.Printf("    - %s: %d\n", key, val)
+	}
+
+	if len(s.Source) > 0 {
+		fmt.Printf("Source: \n")
+		for key, val := range s.Source {
+			fmt.Printf("    - %d: %d\n", key, val)
+		}
+	}
 }
 
 func Summary(inputPath string, threads int, compress bool) error {
@@ -109,10 +151,7 @@ func Summary(inputPath string, threads int, compress bool) error {
 		close(stats)
 	}()
 
-	allStats := &Stats{
-		Orgs:   make(map[string]int),
-		Labels: make(map[string]int),
-	}
+	allStats := NewStats()
 
 	for s := range stats {
 		allStats.Add(s)
@@ -125,31 +164,6 @@ func Summary(inputPath string, threads int, compress bool) error {
 	allStats.Print()
 
 	return nil
-}
-
-func (s *Stats) Add(from *Stats) {
-	s.Total += from.Total
-	for key, val := range from.Labels {
-		s.Labels[key] += val
-	}
-	for key, val := range from.Orgs {
-		s.Orgs[key] += val
-	}
-}
-
-func (s *Stats) Print() {
-	fmt.Printf("Total: %d\n", s.Total)
-	fmt.Printf("Labels: \n")
-	for key, val := range s.Labels {
-		fmt.Printf("    - %s: %d\n", key, val)
-	}
-
-	if len(s.Orgs) > 0 {
-		fmt.Printf("Organizations: \n")
-		for key, val := range s.Orgs {
-			fmt.Printf("    - %s: %d\n", key, val)
-		}
-	}
 }
 
 func fileSummary(inputPath string, compress bool) (*Stats, error) {
@@ -177,10 +191,7 @@ func fileSummary(inputPath string, compress bool) (*Stats, error) {
 		r = terf.NewReader(in)
 	}
 
-	stats := &Stats{
-		Orgs:   make(map[string]int),
-		Labels: make(map[string]int),
-	}
+	stats := NewStats()
 
 	for {
 		ex, err := r.Next()
@@ -197,10 +208,12 @@ func fileSummary(inputPath string, compress bool) (*Stats, error) {
 		}
 
 		stats.Total++
-		if len(img.Organization) > 0 {
-			stats.Orgs[img.Organization]++
+		if len(img.LabelText) > 0 {
+			stats.LabelText[img.LabelText]++
 		}
-		stats.Labels[img.LabelText]++
+		stats.LabelID[img.LabelID]++
+		stats.LabelRaw[img.LabelRaw]++
+		stats.Source[img.SourceID]++
 	}
 
 	return stats, nil

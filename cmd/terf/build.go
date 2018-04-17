@@ -29,20 +29,11 @@ import (
 	"os"
 	"path/filepath"
 	"runtime"
-	"strconv"
 
 	log "github.com/sirupsen/logrus"
 	"github.com/ubccr/terf"
 	"golang.org/x/sync/errgroup"
 )
-
-type ImageRecord struct {
-	Path         string
-	ID           int
-	LabelID      int
-	LabelText    string
-	Organization string
-}
 
 type Shard struct {
 	BaseDir  string
@@ -50,7 +41,7 @@ type Shard struct {
 	ID       int
 	Total    int
 	Compress bool
-	Images   []*ImageRecord
+	Records  [][]string
 }
 
 func (s *Shard) Next() *Shard {
@@ -60,32 +51,8 @@ func (s *Shard) Next() *Shard {
 		Total:    s.Total,
 		ID:       s.ID + 1,
 		Compress: s.Compress,
-		Images:   make([]*ImageRecord, 0),
+		Records:  make([][]string, 0),
 	}
-}
-
-func (i *ImageRecord) FromRow(row []string) error {
-	// Format: image_path,id,label_id,label_text,organization
-	if len(row) != 5 {
-		return errors.New("Invalid row format")
-	}
-
-	id, err := strconv.Atoi(row[1])
-	if err != nil {
-		return err
-	}
-	lid, err := strconv.Atoi(row[2])
-	if err != nil {
-		return err
-
-	}
-	i.Path = row[0]
-	i.ID = id
-	i.LabelID = lid
-	i.LabelText = row[3]
-	i.Organization = row[4]
-
-	return nil
 }
 
 func lineCounter(r io.Reader) (int, error) {
@@ -160,6 +127,7 @@ func Build(infile, outdir, name string, numPerBatch, threads int, compress bool)
 		return err
 	}
 
+	// Sanity check
 	if header[0] != "image_path" {
 		return errors.New("Invalid header")
 	}
@@ -170,7 +138,7 @@ func Build(infile, outdir, name string, numPerBatch, threads int, compress bool)
 		Name:     name,
 		BaseDir:  outdir,
 		Compress: compress,
-		Images:   make([]*ImageRecord, 0),
+		Records:  make([][]string, 0),
 	}
 
 	g, ctx := errgroup.WithContext(context.TODO())
@@ -188,18 +156,9 @@ func Build(infile, outdir, name string, numPerBatch, threads int, compress bool)
 				return err
 			}
 
-			ir := &ImageRecord{}
-			err = ir.FromRow(row)
-			if err != nil {
-				log.WithFields(log.Fields{
-					"error": err,
-				}).Error("Failed to parse image record from csv")
-				continue
-			}
+			shard.Records = append(shard.Records, row)
 
-			shard.Images = append(shard.Images, ir)
-
-			if len(shard.Images)%numPerBatch == 0 {
+			if len(shard.Records)%numPerBatch == 0 {
 				select {
 				case shards <- shard:
 				case <-ctx.Done():
@@ -209,7 +168,7 @@ func Build(infile, outdir, name string, numPerBatch, threads int, compress bool)
 			}
 		}
 
-		if len(shard.Images) > 0 {
+		if len(shard.Records) > 0 {
 			select {
 			case shards <- shard:
 			case <-ctx.Done():
@@ -251,9 +210,9 @@ func process(shard *Shard) error {
 	outfile := fmt.Sprintf("%s-%.5d-of-%.5d", shard.Name, shard.ID, shard.Total)
 
 	log.WithFields(log.Fields{
-		"file":   outfile,
-		"images": len(shard.Images),
-		"zlib":   shard.Compress,
+		"file":    outfile,
+		"records": len(shard.Records),
+		"zlib":    shard.Compress,
 	}).Info("Processing shard")
 
 	out, err := os.Create(filepath.Join(shard.BaseDir, outfile))
@@ -273,13 +232,9 @@ func process(shard *Shard) error {
 		w = terf.NewWriter(out)
 	}
 
-	for _, ir := range shard.Images {
-		fh, err := os.Open(ir.Path)
-		if err != nil {
-			return err
-		}
-
-		img, err := terf.NewImage(fh, ir.ID, ir.LabelID, ir.LabelText, filepath.Base(ir.Path), ir.Organization)
+	for _, row := range shard.Records {
+		img := &terf.Image{}
+		err := img.UnmarshalCSV(row)
 		if err != nil {
 			return err
 		}

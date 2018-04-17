@@ -20,11 +20,14 @@ package terf
 import (
 	"bytes"
 	"errors"
+	"fmt"
 	"image"
 	"image/color"
 	"image/jpeg"
 	"io"
 	"os"
+	"path/filepath"
+	"strconv"
 
 	protobuf "github.com/ubccr/terf/protobuf"
 
@@ -42,44 +45,36 @@ const (
 type Image struct {
 	image.Image
 
-	ID           int
-	Width        int
-	Height       int
-	LabelID      int
-	LabelText    string
-	Organization string
-	Filename     string
+	// Unique ID for the image
+	ID int
+
+	// Width in pixels of the image
+	Width int
+
+	// Height in pixels of the image
+	Height int
+
+	// Integer ID for the normalized label (class)
+	LabelID int
+
+	// Integer ID for the raw label
+	LabelRaw int
+
+	// The human-readable version of the normalized label
+	LabelText string
+
+	// Integer ID for the source of the image. This is typically the
+	// organization or owner that created the image
+	SourceID int
+
+	// Base filename of the original image
+	Filename string
 }
 
-// RGBImage is a JPEG encoded image in the RGB colorspace
+// RGBImage is a JPEG encoded image in the RGB colorspace. This wraps
+// image.Image and ensures the image will be decoded using NRGBAModel
 type RGBImage struct {
 	img image.Image
-}
-
-// NewImage returns a new Image. r is the io.Reader for the raw image data, id
-// is the unique identifier for the image, labelID is the integer identifier of
-// the label, labelText is the label, filename is the name of the file, and org
-// is the organization that produced the image
-func NewImage(r io.Reader, id, labelID int, labelText, filename, org string) (*Image, error) {
-	im, _, err := image.Decode(r)
-	if err != nil {
-		return nil, err
-	}
-
-	rimg := &Image{
-		Image:        im,
-		ID:           id,
-		LabelID:      labelID,
-		LabelText:    labelText,
-		Organization: org,
-		Filename:     filename,
-	}
-
-	b := im.Bounds()
-	rimg.Width = b.Max.X
-	rimg.Height = b.Max.Y
-
-	return rimg, nil
 }
 
 func (i *RGBImage) ColorModel() color.Model {
@@ -94,6 +89,8 @@ func (i *RGBImage) At(x, y int) color.Color {
 	return color.NRGBAModel.Convert(i.img.At(x, y))
 }
 
+// int64Feature is a helper function for encoding Tensorflow Example proto
+// Int64 features
 func (i *Image) int64Feature(val int64) *protobuf.Feature {
 	return &protobuf.Feature{
 		Kind: &protobuf.Feature_Int64List{
@@ -104,6 +101,8 @@ func (i *Image) int64Feature(val int64) *protobuf.Feature {
 	}
 }
 
+// floatFeature is a helper function for encoding Tensorflow Example proto
+// Float features
 func (i *Image) floatFeature(val float32) *protobuf.Feature {
 	return &protobuf.Feature{
 		Kind: &protobuf.Feature_FloatList{
@@ -114,6 +113,8 @@ func (i *Image) floatFeature(val float32) *protobuf.Feature {
 	}
 }
 
+// bytesFeature is a helper function for encoding Tensorflow Example proto
+// Bytes features
 func (i *Image) bytesFeature(val []byte) *protobuf.Feature {
 	return &protobuf.Feature{
 		Kind: &protobuf.Feature_BytesList{
@@ -124,7 +125,116 @@ func (i *Image) bytesFeature(val []byte) *protobuf.Feature {
 	}
 }
 
-// UnmarshalExample copies the data from a Tensorflow example proto to Image i.
+// NewImage returns a new Image. r is the io.Reader for the raw image data, id
+// is the unique identifier for the image, labelID is the integer identifier of
+// the normalized label, labelRaw is the integer identifier for the raw label,
+// labelText is the normalized label, filename is the base name of the file,
+// and sourceID is the source that produced the image
+func NewImage(r io.Reader, id, labelID, labelRaw int, labelText, filename string, sourceID int) (*Image, error) {
+	im, _, err := image.Decode(r)
+	if err != nil {
+		return nil, err
+	}
+
+	rimg := &Image{
+		Image:     im,
+		ID:        id,
+		LabelID:   labelID,
+		LabelRaw:  labelRaw,
+		LabelText: labelText,
+		SourceID:  sourceID,
+		Filename:  filename,
+	}
+
+	b := im.Bounds()
+	rimg.Width = b.Max.X
+	rimg.Height = b.Max.Y
+
+	return rimg, nil
+}
+
+// UnmarshalCSV decodes data from a single CSV record row into Image i. The CSV
+// record row is expected to be in the following format:
+//
+//  image_path,image_id,label_id,label_text,label_raw,source
+//
+// The image located at image_path will be decoded into a JPEG image
+func (i *Image) UnmarshalCSV(row []string) error {
+	if len(row) != 6 {
+		return errors.New("Invalid CSV row format")
+	}
+
+	iid, err := strconv.Atoi(row[1])
+	if err != nil {
+		return err
+	}
+	lid, err := strconv.Atoi(row[2])
+	if err != nil {
+		return err
+
+	}
+	rid, err := strconv.Atoi(row[4])
+	if err != nil {
+		return err
+
+	}
+	sid, err := strconv.Atoi(row[5])
+	if err != nil {
+		return err
+
+	}
+
+	i.ID = iid
+	i.LabelID = lid
+	i.LabelText = row[3]
+	i.LabelRaw = rid
+	i.SourceID = sid
+
+	fh, err := os.Open(row[0])
+	if err != nil {
+		return err
+	}
+	defer fh.Close()
+
+	im, _, err := image.Decode(fh)
+	if err != nil {
+		return err
+	}
+
+	i.Image = im
+	i.Filename = filepath.Base(row[0])
+
+	b := im.Bounds()
+	i.Width = b.Max.X
+	i.Height = b.Max.Y
+
+	return nil
+}
+
+// Name returns the generated base filename for the image: [id].jpg
+func (i *Image) Name() string {
+	if len(i.LabelText) > 0 {
+		return filepath.Join(i.LabelText, fmt.Sprintf("%d.jpg", i.ID))
+	}
+
+	return fmt.Sprintf("%d.jpg", i.ID)
+}
+
+// MarshalCSV encodes Image i into a CSV record. This is the inverse of
+// UnmarshalCSV. The image_path will be generated based on the id of the image
+// and the provided baseDir.
+func (i *Image) MarshalCSV(baseDir string) []string {
+	return []string{
+		filepath.Join(baseDir, i.Name()),
+		strconv.Itoa(i.ID),
+		strconv.Itoa(i.LabelID),
+		i.LabelText,
+		strconv.Itoa(i.LabelRaw),
+		strconv.Itoa(i.SourceID),
+	}
+}
+
+// UnmarshalExample decodes data from a Tensorflow example proto into Image i.
 // This is the inverse of MarshalExample.
 func (i *Image) UnmarshalExample(example *protobuf.Example) error {
 	// TODO handle errors if feature key does not exist or is wrong type
@@ -135,16 +245,17 @@ func (i *Image) UnmarshalExample(example *protobuf.Example) error {
 		return err
 	}
 
-	// TODO handle errors if feature key does not exist or is wrong type
-	// TODO make organization optional?
+	// TODO handle errors if feature keys do not exist or is wrong type
+	// TODO make features optional? or configurable?
 	i.Image = im
 	i.ID = int(example.Features.Feature["image/id"].Kind.(*protobuf.Feature_Int64List).Int64List.Value[0])
-	i.LabelID = int(example.Features.Feature["image/class/label"].Kind.(*protobuf.Feature_Int64List).Int64List.Value[0])
-	i.LabelText = string(example.Features.Feature["image/class/text"].Kind.(*protobuf.Feature_BytesList).BytesList.Value[0])
-	i.Filename = string(example.Features.Feature["image/filename"].Kind.(*protobuf.Feature_BytesList).BytesList.Value[0])
-	i.Organization = string(example.Features.Feature["image/organization"].Kind.(*protobuf.Feature_BytesList).BytesList.Value[0])
 	i.Height = int(example.Features.Feature["image/height"].Kind.(*protobuf.Feature_Int64List).Int64List.Value[0])
 	i.Width = int(example.Features.Feature["image/width"].Kind.(*protobuf.Feature_Int64List).Int64List.Value[0])
+	i.LabelID = int(example.Features.Feature["image/class/label"].Kind.(*protobuf.Feature_Int64List).Int64List.Value[0])
+	i.LabelRaw = int(example.Features.Feature["image/class/raw"].Kind.(*protobuf.Feature_Int64List).Int64List.Value[0])
+	i.LabelText = string(example.Features.Feature["image/class/text"].Kind.(*protobuf.Feature_BytesList).BytesList.Value[0])
+	i.SourceID = int(example.Features.Feature["image/class/source"].Kind.(*protobuf.Feature_Int64List).Int64List.Value[0])
+	i.Filename = string(example.Features.Feature["image/filename"].Kind.(*protobuf.Feature_BytesList).BytesList.Value[0])
 
 	b := im.Bounds()
 
@@ -160,7 +271,21 @@ func (i *Image) UnmarshalExample(example *protobuf.Example) error {
 }
 
 // MarshalExample converts the Image to a Tensorflow Example proto converting
-// the raw image to JPEG format in RGB colorspace
+// the raw image to JPEG format in RGB colorspace. The Example proto schema is
+// as follows:
+//
+//  image/height: integer, image height in pixels
+//  image/width: integer, image width in pixels
+//  image/colorspace: string, specifying the colorspace, always 'RGB'
+//  image/channels: integer, specifying the number of channels, always 3
+//  image/class/label: integer, specifying the index in a normalized classification layer
+//  image/class/raw: integer, specifying the index in the raw (original) classification layer
+//  image/class/source: integer, specifying the index of the source (creator of the image)
+//  image/class/text: string, specifying the human-readable version of the normalized label
+//  image/format: string, specifying the format, always 'JPEG'
+//  image/filename: string containing the basename of the image file
+//  image/id: integer, specifying the unique id for the image
+//  image/encoded: string, containing JPEG encoded image in RGB colorspace
 func (i *Image) MarshalExample() (*protobuf.Example, error) {
 
 	// Convert image to RGB JPEG
@@ -178,11 +303,12 @@ func (i *Image) MarshalExample() (*protobuf.Example, error) {
 				"image/colorspace":   i.bytesFeature([]byte(ColorSpace)),
 				"image/channels":     i.int64Feature(Channels),
 				"image/class/label":  i.int64Feature(int64(i.LabelID)),
+				"image/class/raw":    i.int64Feature(int64(i.LabelRaw)),
+				"image/class/source": i.int64Feature(int64(i.SourceID)),
 				"image/class/text":   i.bytesFeature([]byte(i.LabelText)),
 				"image/format":       i.bytesFeature([]byte(Format)),
 				"image/filename":     i.bytesFeature([]byte(i.Filename)),
 				"image/id":           i.int64Feature(int64(i.ID)),
-				"image/organization": i.bytesFeature([]byte(i.Organization)),
 				"image/encoded":      i.bytesFeature(buf.Bytes()),
 			},
 		},
