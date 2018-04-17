@@ -2,22 +2,157 @@
 terf - Tensorflow TFRecords file format Reader/Writer
 ===============================================================================
 
-terf is a Go library for reading/writing Tensorflow TFRecords file format.
+|godoc|
+
+terf is a Go library for reading/writing Tensorflow TFRecords file format. The
+main goal of this library is to provide an easy way to generate example image
+datasets for use in Tensorflow. With terf you can easily build, inspect, and
+extract image datasets from the command line without having to install
+Tensorflow. terf was developed for use with `MARCO <https://marco.ccr.buffalo.edu>`_ 
+but can be used for building any generic image dataset. The TFRecords file
+format is based on the imagenet dataset from the inception research model in
+Tensorflow.
+
+-------------------------------------------------------------------------------
+Examples
+-------------------------------------------------------------------------------
+
+~~~~~~~~~~~~~~~~~~~~~~~~~
+Create an image dataset
+~~~~~~~~~~~~~~~~~~~~~~~~~
+
+You have a directory of images that have been labeled and you want to build an
+image dataset that can be used in Tensorflow. First step is to create a CSV
+file in the following format::
+
+	image_path,image_id,label_id,label_text,label_raw,source
+
+Where image_path is the path to the raw image file, image_id is the unique
+identifier for an image, label_id is the integer identifier of the normalized
+label, label_raw is the integer identifier for the raw label, label_text is the
+normalized label, and source is the source (organization/creator etc) that
+produced the image. For example::
+
+	image_path,image_id,label_id,label_text,label_raw,source
+	/data/03c3_G6_ImagerDefaults_6.jpg,123,1,Crystals,12,101
+	/data/X0000056450155200509052032.png,124,0,Clear,15,104
+
+
+To build the image dataset run the following command::
+
+	$ ./terf -d build --input images.csv --output train_directory/ --size 1024	
+
+This will convert the image data into a sharded data set of TFRecord files in
+the train/ output directory::
+	
+	train_directory/train-00000-of-00024
+	train_directory/train-00001-of-00024
+	...
+	train_directory/train-00023-of-00024
+
+Each TFRecord file will contain ~1024 records. Each record within the TFRecord
+file is a serialized Example proto. The Example proto contains the following
+fields::
+
+	image/height: integer, image height in pixels
+	image/width: integer, image width in pixels
+	image/colorspace: string, specifying the colorspace, always 'RGB'
+	image/channels: integer, specifying the number of channels, always 3
+	image/class/label: integer, specifying the index in a normalized classification layer
+	image/class/raw: integer, specifying the index in the raw (original) classification layer
+	image/class/source: integer, specifying the index of the source (creator of the image)
+	image/class/text: string, specifying the human-readable version of the normalized label
+	image/format: string, specifying the format, always 'JPEG'
+	image/filename: string containing the basename of the image file
+	image/id: integer, specifying the unique id for the image
+	image/encoded: string, containing JPEG encoded image in RGB colorspace
+
+~~~~~~~~~~~~~~~~~~~~~~~~~
+Inspect an image dataset
+~~~~~~~~~~~~~~~~~~~~~~~~~
+
+Generate summary statistics on an image dataset::
+
+	$ ./terf -d summary --input train_directory/
+	INFO[0000] Processing file  path=train_directory/train-00001-of-00001 zlib=false
+	Total: 10
+	Label: 
+		- Clear: 5
+		- Precipitate: 4
+		- Crystals: 1
+	Source: 
+		- 2: 2
+		- 3: 6
+		- 1: 2
+	Label ID: 
+		- 1: 1
+		- 0: 5
+		- 3: 4
+	Label Raw: 
+		- 30: 1
+		- 2: 3
+		- 8: 1
+		- 16: 1
+		- 1: 2
+		- 14: 2
+
+~~~~~~~~~~~~~~~~~~~~~~~~~
+Extract an image dataset
+~~~~~~~~~~~~~~~~~~~~~~~~~
+
+Extract the raw image data from a dataset::
+
+	$ ./terf -d extract --input train_directory -o dump/
+	INFO[0000] Processing file    path=train_directory/train-00001-of-00001 zlib=false
+	$ find dump/
+	dump/
+	dump/info.csv
+	dump/Clear
+	dump/Clear/396612.jpg
+	dump/Clear/90089.jpg
+	dump/Clear/192089.jpg
+	dump/Clear/283709.jpg
+	dump/Clear/82162.jpg
+	dump/Precipitate
+	dump/Precipitate/286612.jpg
+	dump/Precipitate/421709.jpg
+	dump/Precipitate/296118.jpg
+	dump/Precipitate/163507.jpg
+	dump/Crystals
+	dump/Crystals/80373.jpg
+
+
+~~~~~~~~~~~~~~~~~~~~~~
+Go
+~~~~~~~~~~~~~~~~~~~~~~
+
+Parse TFRecords file in Go::
+
+	in, err := os.Open("train-00001-of-01024")
+	if err != nil {
+		log.Fatal(err)
+	}
+	defer in.Close()
+
+	r := terf.NewReader(in)
+
+	for {
+		example, err := r.Next()
+		if err == io.EOF {
+			break
+		} else if err != nil {
+			log.Fatal(err)
+		}
+
+		// Do something with example
+	}
 
 -------------------------------------------------------------------------------
 License
 -------------------------------------------------------------------------------
 
-Copyright (C) 2018 Andrew E. Bruno
+terf is released under the GPLv3 License. See the LICENSE file.
 
-terf is free software: you can redistribute it and/or modify it under the
-terms of the GNU General Public License as published by the Free Software
-Foundation, either version 3 of the License, or (at your option) any later
-version.
-
-This program is distributed in the hope that it will be useful, but WITHOUT ANY
-WARRANTY; without even the implied warranty of MERCHANTABILITY or FITNESS FOR A
-PARTICULAR PURPOSE. See the GNU General Public License for more details.
-
-You should have received a copy of the GNU General Public License along with
-this program. If not, see <http://www.gnu.org/licenses/>.
+.. |godoc| image:: https://godoc.org/github.com/golang/gddo?status.svg
+    :target: https://godoc.org/github.com/ubccr/terf
+    :alt: Godoc
