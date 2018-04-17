@@ -264,11 +264,23 @@ func (i *Image) UnmarshalCSV(row []string) error {
 
 // Name returns the generated base filename for the image: [id].jpg
 func (i *Image) Name() string {
-	if len(i.LabelText) > 0 {
-		return filepath.Join(i.LabelText, fmt.Sprintf("%d.jpg", i.ID))
+	var name string
+
+	// Use ID if exists to ensure unique names otherwise use Filename
+	if i.ID > 0 {
+		name = fmt.Sprintf("%d.jpg", i.ID)
+	} else if len(i.Filename) > 0 {
+		name = i.Filename
+	} else {
+		// TODO generate a name?
+		name = "image.jpg"
 	}
 
-	return fmt.Sprintf("%d.jpg", i.ID)
+	if len(i.LabelText) > 0 {
+		return filepath.Join(i.LabelText, name)
+	}
+
+	return name
 }
 
 // MarshalCSV encodes Image i into a CSV record. This is the inverse of
