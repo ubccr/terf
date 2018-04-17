@@ -22,12 +22,16 @@ import (
 	"github.com/urfave/cli"
 )
 
+var (
+	TerfVersion = "dev"
+)
+
 func main() {
 	app := cli.NewApp()
 	app.Name = "terf"
 	app.Authors = []cli.Author{cli.Author{Name: "Andrew E. Bruno", Email: "aebruno2@buffalo.edu"}}
 	app.Usage = "terf"
-	app.Version = "0.0.1"
+	app.Version = TerfVersion
 	app.Flags = []cli.Flag{
 		&cli.BoolFlag{Name: "debug,d", Usage: "Print verbose messages"},
 	}
