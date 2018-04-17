@@ -15,6 +15,7 @@
 // You should have received a copy of the GNU General Public License
 // along with terf.  If not, see <http://www.gnu.org/licenses/>.
 
+// Package terf implements a reader/writer for Tensorflow TFRecord files
 package terf
 
 import (
