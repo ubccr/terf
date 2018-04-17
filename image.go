@@ -82,42 +82,6 @@ func NewImage(r io.Reader, id, labelID int, labelText, filename, org string) (*I
 	return rimg, nil
 }
 
-// NewImageFromExample returns a new Image from a Tensorflow example
-func NewImageFromExample(example *protobuf.Example) (*Image, error) {
-	// TODO handle errors if feature key does not exist or is wrong type
-	raw := example.Features.Feature["image/encoded"].Kind.(*protobuf.Feature_BytesList).BytesList.Value[0]
-
-	im, _, err := image.Decode(bytes.NewReader(raw))
-	if err != nil {
-		return nil, err
-	}
-
-	// TODO handle errors if feature key does not exist or is wrong type
-	// TODO make organization optional?
-	rimg := &Image{
-		Image:        im,
-		ID:           int(example.Features.Feature["image/id"].Kind.(*protobuf.Feature_Int64List).Int64List.Value[0]),
-		LabelID:      int(example.Features.Feature["image/class/label"].Kind.(*protobuf.Feature_Int64List).Int64List.Value[0]),
-		LabelText:    string(example.Features.Feature["image/class/text"].Kind.(*protobuf.Feature_BytesList).BytesList.Value[0]),
-		Filename:     string(example.Features.Feature["image/filename"].Kind.(*protobuf.Feature_BytesList).BytesList.Value[0]),
-		Organization: string(example.Features.Feature["image/organization"].Kind.(*protobuf.Feature_BytesList).BytesList.Value[0]),
-		Height:       int(example.Features.Feature["image/height"].Kind.(*protobuf.Feature_Int64List).Int64List.Value[0]),
-		Width:        int(example.Features.Feature["image/width"].Kind.(*protobuf.Feature_Int64List).Int64List.Value[0]),
-	}
-
-	b := im.Bounds()
-
-	if rimg.Width != b.Max.X {
-		return nil, errors.New("Invalid width")
-	}
-
-	if rimg.Height != b.Max.Y {
-		return nil, errors.New("Invalid height")
-	}
-
-	return rimg, nil
-}
-
 func (i *RGBImage) ColorModel() color.Model {
 	return color.NRGBAModel
 }
@@ -160,9 +124,44 @@ func (i *Image) bytesFeature(val []byte) *protobuf.Feature {
 	}
 }
 
-// ToExample converts the Image to a Tensorflow Example converting the
-// raw image to JPEG format in RGB colorspace
-func (i *Image) ToExample() (*protobuf.Example, error) {
+// UnmarshalExample copies the data from a Tensorflow example proto to Image i.
+// This is the inverse of MarshalExample.
+func (i *Image) UnmarshalExample(example *protobuf.Example) error {
+	// TODO handle errors if feature key does not exist or is wrong type
+	raw := example.Features.Feature["image/encoded"].Kind.(*protobuf.Feature_BytesList).BytesList.Value[0]
+
+	im, _, err := image.Decode(bytes.NewReader(raw))
+	if err != nil {
+		return err
+	}
+
+	// TODO handle errors if feature key does not exist or is wrong type
+	// TODO make organization optional?
+	i.Image = im
+	i.ID = int(example.Features.Feature["image/id"].Kind.(*protobuf.Feature_Int64List).Int64List.Value[0])
+	i.LabelID = int(example.Features.Feature["image/class/label"].Kind.(*protobuf.Feature_Int64List).Int64List.Value[0])
+	i.LabelText = string(example.Features.Feature["image/class/text"].Kind.(*protobuf.Feature_BytesList).BytesList.Value[0])
+	i.Filename = string(example.Features.Feature["image/filename"].Kind.(*protobuf.Feature_BytesList).BytesList.Value[0])
+	i.Organization = string(example.Features.Feature["image/organization"].Kind.(*protobuf.Feature_BytesList).BytesList.Value[0])
+	i.Height = int(example.Features.Feature["image/height"].Kind.(*protobuf.Feature_Int64List).Int64List.Value[0])
+	i.Width = int(example.Features.Feature["image/width"].Kind.(*protobuf.Feature_Int64List).Int64List.Value[0])
+
+	b := im.Bounds()
+
+	if i.Width != b.Max.X {
+		return errors.New("Invalid width")
+	}
+
+	if i.Height != b.Max.Y {
+		return errors.New("Invalid height")
+	}
+
+	return nil
+}
+
+// MarshalExample converts the Image to a Tensorflow Example proto converting
+// the raw image to JPEG format in RGB colorspace
+func (i *Image) MarshalExample() (*protobuf.Example, error) {
 
 	// Convert image to RGB JPEG
 	buf := new(bytes.Buffer)

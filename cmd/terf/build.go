@@ -284,7 +284,7 @@ func process(shard *Shard) error {
 			return err
 		}
 
-		ex, err := img.ToExample()
+		ex, err := img.MarshalExample()
 		if err != nil {
 			return err
 		}

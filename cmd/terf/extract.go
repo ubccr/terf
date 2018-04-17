@@ -239,7 +239,8 @@ func extractFile(inputPath, outdir string, compress bool) ([]*ImageRecord, error
 			return nil, err
 		}
 
-		img, err := terf.NewImageFromExample(ex)
+		img := &terf.Image{}
+		err = img.UnmarshalExample(ex)
 		if err != nil {
 			return nil, err
 		}

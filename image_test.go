@@ -51,7 +51,7 @@ func TestRoundTrip(t *testing.T) {
 		t.Errorf("Incorrect height: got %d should be %d", im.Height, height)
 	}
 
-	example, err := im.ToExample()
+	example, err := im.MarshalExample()
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -69,7 +69,8 @@ func TestRoundTrip(t *testing.T) {
 			t.Fatal(err)
 		}
 
-		img, err := NewImageFromExample(ex)
+		img := &Image{}
+		err = img.UnmarshalExample(ex)
 		if err != nil {
 			t.Fatal(err)
 		}
