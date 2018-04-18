@@ -19,10 +19,10 @@
 package terf
 
 import (
+	"bufio"
 	"encoding/binary"
 	"hash/crc32"
 	"io"
-	"bufio"
 
 	"github.com/golang/protobuf/proto"
 	protobuf "github.com/ubccr/terf/protobuf"
@@ -44,8 +44,8 @@ type Writer struct {
 // NewWriter returns a new Writer
 func NewWriter(w io.Writer) *Writer {
 	return &Writer{
-        writer: bufio.NewWriter(w),
-    }
+		writer: bufio.NewWriter(w),
+	}
 }
 
 // Returns the masked CRC32C of data
@@ -61,9 +61,9 @@ func (w *Writer) Error() error {
 }
 
 // Flush writes any buffered data to the underlying io.Writer. To check if an
-// error occurred during the Flush, call Error. 
+// error occurred during the Flush, call Error.
 func (w *Writer) Flush() {
-    w.writer.Flush()
+	w.writer.Flush()
 }
 
 // Write writes the Example in TFRecords format

@@ -18,11 +18,11 @@
 package terf
 
 import (
+	"bufio"
 	"encoding/binary"
 	"errors"
 	"hash/crc32"
 	"io"
-	"bufio"
 
 	"github.com/golang/protobuf/proto"
 	protobuf "github.com/ubccr/terf/protobuf"
@@ -36,8 +36,8 @@ type Reader struct {
 // NewReader returns a new Reader
 func NewReader(r io.Reader) *Reader {
 	return &Reader{
-        reader: bufio.NewReader(r),
-    }
+		reader: bufio.NewReader(r),
+	}
 }
 
 // Verify checksum
