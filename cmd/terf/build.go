@@ -18,6 +18,7 @@
 package main
 
 import (
+	"bufio"
 	"bytes"
 	"compress/zlib"
 	"context"
@@ -112,7 +113,9 @@ func Build(infile, outdir, name string, numPerBatch, threads int, compress bool)
 	}
 	defer in.Close()
 
-	total, err := lineCounter(in)
+	bufin := bufio.NewReader(in)
+
+	total, err := lineCounter(bufin)
 	if err != nil {
 		return err
 	}
@@ -124,7 +127,8 @@ func Build(infile, outdir, name string, numPerBatch, threads int, compress bool)
 	}
 
 	in.Seek(0, 0)
-	r := csv.NewReader(in)
+	bufin.Reset(in)
+	r := csv.NewReader(bufin)
 
 	// Parse header info
 	header, err := r.Read()
@@ -226,15 +230,18 @@ func process(shard *Shard) error {
 	}
 	defer out.Close()
 
+	bufout := bufio.NewWriter(out)
+	defer bufout.Flush()
+
 	var w *terf.Writer
 
 	if shard.Compress {
-		zout := zlib.NewWriter(out)
+		zout := zlib.NewWriter(bufout)
 		defer zout.Close()
 
 		w = terf.NewWriter(zout)
 	} else {
-		w = terf.NewWriter(out)
+		w = terf.NewWriter(bufout)
 	}
 
 	for _, row := range shard.Records {

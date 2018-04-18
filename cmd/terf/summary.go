@@ -18,6 +18,7 @@
 package main
 
 import (
+	"bufio"
 	"compress/zlib"
 	"context"
 	"fmt"
@@ -192,9 +193,11 @@ func fileSummary(inputPath string, compress bool) (*Stats, error) {
 	}
 	defer in.Close()
 
+	bufin := bufio.NewReader(in)
+
 	var r *terf.Reader
 	if compress {
-		zin, err := zlib.NewReader(in)
+		zin, err := zlib.NewReader(bufin)
 		if err != nil {
 			return nil, err
 		}
@@ -202,7 +205,7 @@ func fileSummary(inputPath string, compress bool) (*Stats, error) {
 
 		r = terf.NewReader(zin)
 	} else {
-		r = terf.NewReader(in)
+		r = terf.NewReader(bufin)
 	}
 
 	stats := NewStats()

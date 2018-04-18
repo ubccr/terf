@@ -18,6 +18,7 @@
 package main
 
 import (
+	"bufio"
 	"compress/zlib"
 	"context"
 	"encoding/csv"
@@ -77,7 +78,10 @@ func Extract(inputPath, outPath string, threads int, compress bool) error {
 		}
 		defer out.Close()
 
-		w := csv.NewWriter(out)
+		bufout := bufio.NewWriter(out)
+		defer bufout.Flush()
+
+		w := csv.NewWriter(bufout)
 		err = writeHeader(w)
 		if err != nil {
 			return err
@@ -150,7 +154,10 @@ func Extract(inputPath, outPath string, threads int, compress bool) error {
 	}
 	defer out.Close()
 
-	w := csv.NewWriter(out)
+	bufout := bufio.NewWriter(out)
+	defer bufout.Flush()
+
+	w := csv.NewWriter(bufout)
 	err = writeHeader(w)
 	if err != nil {
 		return err
@@ -207,9 +214,11 @@ func extractFile(inputPath, outdir string, compress bool) ([]*terf.Image, error)
 	}
 	defer in.Close()
 
+	bufin := bufio.NewReader(in)
+
 	var r *terf.Reader
 	if compress {
-		zin, err := zlib.NewReader(in)
+		zin, err := zlib.NewReader(bufin)
 		if err != nil {
 			return nil, err
 		}
@@ -217,7 +226,7 @@ func extractFile(inputPath, outdir string, compress bool) ([]*terf.Image, error)
 
 		r = terf.NewReader(zin)
 	} else {
-		r = terf.NewReader(in)
+		r = terf.NewReader(bufin)
 	}
 
 	images := make([]*terf.Image, 0)
