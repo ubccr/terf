@@ -187,7 +187,11 @@ func writeHeader(w *csv.Writer) error {
 
 func writeLabels(w *csv.Writer, outdir string, images []*terf.Image) error {
 	for _, i := range images {
-		if err := w.Write(i.MarshalCSV(outdir)); err != nil {
+		outpath := outdir
+		if len(i.LabelText) > 0 {
+			outpath = filepath.Join(outdir, i.LabelText)
+		}
+		if err := w.Write(i.MarshalCSV(outpath)); err != nil {
 			return err
 		}
 	}
@@ -236,7 +240,11 @@ func extractFile(inputPath, outdir string, compress bool) ([]*terf.Image, error)
 			return nil, err
 		}
 
-		fname := filepath.Join(outdir, img.Name())
+		outpath := outdir
+		if len(img.LabelText) > 0 {
+			outpath = filepath.Join(outdir, img.LabelText)
+		}
+		fname := filepath.Join(outpath, img.Name())
 
 		if err := os.MkdirAll(filepath.Dir(fname), 0755); err != nil {
 			return nil, err

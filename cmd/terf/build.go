@@ -82,7 +82,7 @@ func lineCounter(r io.Reader) (int, error) {
 
 }
 
-func Build(infile, outdir, name string, numPerBatch, threads int, compress bool) error {
+func Build(infile, outdir, name string, numPerBatch, threads int, compress, jpeg bool) error {
 	if len(outdir) == 0 {
 		cwd, err := os.Getwd()
 		if err != nil {
@@ -190,7 +190,7 @@ func Build(infile, outdir, name string, numPerBatch, threads int, compress bool)
 		g.Go(func() error {
 			for shard := range shards {
 
-				err := process(shard)
+				err := process(shard, jpeg)
 				if err != nil {
 					return err
 				}
@@ -213,7 +213,7 @@ func Build(infile, outdir, name string, numPerBatch, threads int, compress bool)
 	return nil
 }
 
-func process(shard *Shard) error {
+func process(shard *Shard, jpeg bool) error {
 	outfile := fmt.Sprintf("%s-%.5d-of-%.5d", shard.Name, shard.ID, shard.Total)
 
 	log.WithFields(log.Fields{
@@ -244,6 +244,13 @@ func process(shard *Shard) error {
 		err := img.UnmarshalCSV(row)
 		if err != nil {
 			return err
+		}
+
+		if jpeg {
+			err := img.ToJPEG()
+			if err != nil {
+				return err
+			}
 		}
 
 		ex, err := img.MarshalExample()

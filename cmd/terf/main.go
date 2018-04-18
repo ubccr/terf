@@ -55,9 +55,10 @@ func main() {
 				&cli.IntFlag{Name: "size,n", Usage: "Number of examples per batch"},
 				&cli.IntFlag{Name: "threads,t", Usage: "Num threads"},
 				&cli.BoolFlag{Name: "compress,z", Usage: "Use zlib compression"},
+				&cli.BoolFlag{Name: "jpeg,j", Usage: "Convert images to JPEG in RGB colorspace"},
 			},
 			Action: func(c *cli.Context) error {
-				err := Build(c.String("input"), c.String("outdir"), c.String("name"), c.Int("size"), c.Int("threads"), c.Bool("compress"))
+				err := Build(c.String("input"), c.String("outdir"), c.String("name"), c.Int("size"), c.Int("threads"), c.Bool("compress"), c.Bool("jpeg"))
 				if err != nil {
 					log.Fatal(err)
 					return cli.NewExitError(err, 1)

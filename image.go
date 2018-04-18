@@ -22,12 +22,14 @@ import (
 	"errors"
 	"fmt"
 	"image"
+	"image/color"
 	"image/draw"
 	"image/jpeg"
 	"io"
 	"os"
 	"path/filepath"
 	"strconv"
+	"strings"
 
 	protobuf "github.com/ubccr/terf/protobuf"
 
@@ -35,16 +37,8 @@ import (
 	_ "image/png"
 )
 
-const (
-	ColorSpace = "RGB"
-	Channels   = 3
-	Format     = "JPEG"
-)
-
 // Image is an Example image for training/validating in Tensorflow
 type Image struct {
-	image.Image
-
 	// Unique ID for the image
 	ID int
 
@@ -69,6 +63,15 @@ type Image struct {
 
 	// Base filename of the original image
 	Filename string
+
+	// Image format (JPEG, PNG)
+	Format string
+
+	// Image colorpace (RGB, Gray)
+	Colorspace string
+
+	// Raw image data
+	Raw []byte
 }
 
 // Int64Feature is a helper function for encoding Tensorflow Example proto
@@ -164,13 +167,7 @@ func ExampleFeatureBytes(example *protobuf.Example, key string) []byte {
 // labelText is the normalized label, filename is the base name of the file,
 // and sourceID is the source that produced the image
 func NewImage(r io.Reader, id, labelID, labelRaw int, labelText, filename string, sourceID int) (*Image, error) {
-	im, _, err := image.Decode(r)
-	if err != nil {
-		return nil, err
-	}
-
-	rimg := &Image{
-		Image:     im,
+	img := &Image{
 		ID:        id,
 		LabelID:   labelID,
 		LabelRaw:  labelRaw,
@@ -179,19 +176,18 @@ func NewImage(r io.Reader, id, labelID, labelRaw int, labelText, filename string
 		Filename:  filename,
 	}
 
-	b := im.Bounds()
-	rimg.Width = b.Max.X
-	rimg.Height = b.Max.Y
+	err := img.Read(r)
+	if err != nil {
+		return nil, err
+	}
 
-	return rimg, nil
+	return img, nil
 }
 
 // UnmarshalCSV decodes data from a single CSV record row into Image i. The CSV
 // record row is expected to be in the following format:
 //
 //  image_path,image_id,label_id,label_text,label_raw,source
-//
-// The image located at image_path will be decoded into a JPEG image
 func (i *Image) UnmarshalCSV(row []string) error {
 	if len(row) != 6 {
 		return errors.New("Invalid CSV row format")
@@ -229,37 +225,28 @@ func (i *Image) UnmarshalCSV(row []string) error {
 	}
 	defer fh.Close()
 
-	im, _, err := image.Decode(fh)
+	err = i.Read(fh)
 	if err != nil {
 		return err
 	}
 
-	i.Image = im
 	i.Filename = filepath.Base(row[0])
-
-	b := im.Bounds()
-	i.Width = b.Max.X
-	i.Height = b.Max.Y
 
 	return nil
 }
 
-// Name returns the generated base filename for the image: [id].jpg
+// Name returns the generated base filename for the image: [id].[format]
 func (i *Image) Name() string {
 	var name string
 
 	// Use ID if exists to ensure unique names otherwise use Filename
 	if i.ID > 0 {
-		name = fmt.Sprintf("%d.jpg", i.ID)
+		name = fmt.Sprintf("%d.%s", i.ID, strings.ToLower(i.Format))
 	} else if len(i.Filename) > 0 {
 		name = i.Filename
 	} else {
 		// TODO generate a name?
-		name = "image.jpg"
-	}
-
-	if len(i.LabelText) > 0 {
-		return filepath.Join(i.LabelText, name)
+		name = fmt.Sprintf("image.%s", strings.ToLower(i.Format))
 	}
 
 	return name
@@ -282,15 +269,8 @@ func (i *Image) MarshalCSV(baseDir string) []string {
 // UnmarshalExample decodes data from a Tensorflow example proto into Image i.
 // This is the inverse of MarshalExample.
 func (i *Image) UnmarshalExample(example *protobuf.Example) error {
-	raw := ExampleFeatureBytes(example, "image/encoded")
-
-	im, _, err := image.Decode(bytes.NewReader(raw))
-	if err != nil {
-		return err
-	}
 
 	// TODO make features optional? or configurable?
-	i.Image = im
 	i.ID = ExampleFeatureInt64(example, "image/id")
 	i.Height = ExampleFeatureInt64(example, "image/height")
 	i.Width = ExampleFeatureInt64(example, "image/width")
@@ -299,75 +279,115 @@ func (i *Image) UnmarshalExample(example *protobuf.Example) error {
 	i.LabelText = string(ExampleFeatureBytes(example, "image/class/text"))
 	i.SourceID = ExampleFeatureInt64(example, "image/class/source")
 	i.Filename = string(ExampleFeatureBytes(example, "image/filename"))
-
-	b := im.Bounds()
-
-	if i.Width != b.Max.X {
-		return errors.New("Invalid width")
-	}
-
-	if i.Height != b.Max.Y {
-		return errors.New("Invalid height")
-	}
+	i.Raw = ExampleFeatureBytes(example, "image/encoded")
+	i.Format = string(ExampleFeatureBytes(example, "image/format"))
 
 	return nil
 }
 
-// MarshalExample converts the Image to a Tensorflow Example proto converting
-// the raw image to JPEG format in RGB colorspace. The Example proto schema is
-// as follows:
+// MarshalExample converts the Image to a Tensorflow Example proto.
+// The Example proto schema is as follows:
 //
 //  image/height: integer, image height in pixels
 //  image/width: integer, image width in pixels
-//  image/colorspace: string, specifying the colorspace, always 'RGB'
+//  image/colorspace: string, specifying the colorspace
 //  image/channels: integer, specifying the number of channels, always 3
 //  image/class/label: integer, specifying the index in a normalized classification layer
 //  image/class/raw: integer, specifying the index in the raw (original) classification layer
 //  image/class/source: integer, specifying the index of the source (creator of the image)
 //  image/class/text: string, specifying the human-readable version of the normalized label
-//  image/format: string, specifying the format, always 'JPEG'
+//  image/format: string, specifying the format
 //  image/filename: string containing the basename of the image file
 //  image/id: integer, specifying the unique id for the image
-//  image/encoded: string, containing JPEG encoded image in RGB colorspace
+//  image/encoded: string, containing the raw encoded image
 func (i *Image) MarshalExample() (*protobuf.Example, error) {
-
-	// Convert image to RGB JPEG
-	b := i.Bounds()
-	im := image.NewRGBA(image.Rect(0, 0, b.Dx(), b.Dy()))
-	draw.Draw(im, im.Bounds(), i, b.Min, draw.Src)
-
-	buf := new(bytes.Buffer)
-	err := jpeg.Encode(buf, im, nil)
-	if err != nil {
-		return nil, err
-	}
-
 	return &protobuf.Example{
 		Features: &protobuf.Features{
 			Feature: map[string]*protobuf.Feature{
 				"image/height":       Int64Feature(int64(i.Height)),
 				"image/width":        Int64Feature(int64(i.Width)),
-				"image/colorspace":   BytesFeature([]byte(ColorSpace)),
-				"image/channels":     Int64Feature(Channels),
+				"image/colorspace":   BytesFeature([]byte(i.Colorspace)),
+				"image/channels":     Int64Feature(3),
 				"image/class/label":  Int64Feature(int64(i.LabelID)),
 				"image/class/raw":    Int64Feature(int64(i.LabelRaw)),
 				"image/class/source": Int64Feature(int64(i.SourceID)),
 				"image/class/text":   BytesFeature([]byte(i.LabelText)),
-				"image/format":       BytesFeature([]byte(Format)),
+				"image/format":       BytesFeature([]byte(strings.ToUpper(i.Format))),
 				"image/filename":     BytesFeature([]byte(i.Filename)),
 				"image/id":           Int64Feature(int64(i.ID)),
-				"image/encoded":      BytesFeature(buf.Bytes()),
+				"image/encoded":      BytesFeature(i.Raw),
 			},
 		},
 	}, nil
 }
 
-// Write writes the Image in JPEG format to w
+// Write writes the raw Image data to w
 func (i *Image) Write(w io.Writer) error {
-	return jpeg.Encode(w, i, nil)
+	buf := bytes.NewReader(i.Raw)
+
+	_, err := buf.WriteTo(w)
+	return err
 }
 
-// Save writes the Image in JPEG format to a file
+// Reads raw image data from r, parses image config and sets Format,
+// Colorspace, Width and Height
+func (i *Image) Read(r io.Reader) error {
+	buf := new(bytes.Buffer)
+	_, err := buf.ReadFrom(r)
+	if err != nil {
+		return err
+	}
+	i.Raw = buf.Bytes()
+
+	cfg, format, err := image.DecodeConfig(bytes.NewReader(i.Raw))
+	if err != nil {
+		return err
+	}
+
+	i.Width = cfg.Width
+	i.Height = cfg.Height
+	i.Format = format
+
+	// TODO add better colorspace detection
+	switch cfg.ColorModel {
+	case color.YCbCrModel, color.RGBAModel, color.NRGBAModel:
+		i.Colorspace = "RGB"
+	case color.CMYKModel:
+		i.Colorspace = "CMYK"
+	case color.GrayModel, color.Gray16Model:
+		i.Colorspace = "Gray"
+	default:
+		i.Colorspace = "Unknown"
+	}
+
+	return nil
+}
+
+// ToJPEG converts Image to JPEG format in RGB colorspace
+func (i *Image) ToJPEG() error {
+	orig, _, err := image.Decode(bytes.NewReader(i.Raw))
+	if err != nil {
+		return err
+	}
+
+	b := orig.Bounds()
+	im := image.NewRGBA(image.Rect(0, 0, b.Dx(), b.Dy()))
+	draw.Draw(im, im.Bounds(), orig, b.Min, draw.Src)
+
+	buf := new(bytes.Buffer)
+	err = jpeg.Encode(buf, im, nil)
+	if err != nil {
+		return err
+	}
+
+	i.Raw = buf.Bytes()
+	i.Format = "jpeg"
+	i.Colorspace = "RGB"
+
+	return nil
+}
+
+// Save writes the Image to a file
 func (i *Image) Save(file string) error {
 	out, err := os.Create(file)
 	if err != nil {

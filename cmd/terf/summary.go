@@ -33,19 +33,23 @@ import (
 )
 
 type Stats struct {
-	Total     int
-	Source    map[int]int
-	LabelID   map[int]int
-	LabelRaw  map[int]int
-	LabelText map[string]int
+	Total      int
+	Source     map[int]int
+	LabelID    map[int]int
+	LabelRaw   map[int]int
+	LabelText  map[string]int
+	Format     map[string]int
+	Colorspace map[string]int
 }
 
 func NewStats() *Stats {
 	return &Stats{
-		Source:    make(map[int]int),
-		LabelID:   make(map[int]int),
-		LabelRaw:  make(map[int]int),
-		LabelText: make(map[string]int),
+		Source:     make(map[int]int),
+		LabelID:    make(map[int]int),
+		LabelRaw:   make(map[int]int),
+		LabelText:  make(map[string]int),
+		Format:     make(map[string]int),
+		Colorspace: make(map[string]int),
 	}
 }
 
@@ -62,6 +66,12 @@ func (s *Stats) Add(from *Stats) {
 	}
 	for key, val := range from.LabelText {
 		s.LabelText[key] += val
+	}
+	for key, val := range from.Format {
+		s.Format[key] += val
+	}
+	for key, val := range from.Colorspace {
+		s.Colorspace[key] += val
 	}
 }
 
@@ -90,6 +100,18 @@ func (s *Stats) Print() {
 		fmt.Printf("Label Raw: \n")
 		for key, val := range s.LabelRaw {
 			fmt.Printf("    - %d: %d\n", key, val)
+		}
+	}
+	if len(s.Format) > 0 {
+		fmt.Printf("Format: \n")
+		for key, val := range s.Format {
+			fmt.Printf("    - %s: %d\n", key, val)
+		}
+	}
+	if len(s.Colorspace) > 0 {
+		fmt.Printf("Colorspace: \n")
+		for key, val := range s.Colorspace {
+			fmt.Printf("    - %s: %d\n", key, val)
 		}
 	}
 }
@@ -218,6 +240,8 @@ func fileSummary(inputPath string, compress bool) (*Stats, error) {
 		labelID := terf.ExampleFeatureInt64(ex, "image/class/label")
 		labelRaw := terf.ExampleFeatureInt64(ex, "image/class/raw")
 		labelText := string(terf.ExampleFeatureBytes(ex, "image/class/text"))
+		format := string(terf.ExampleFeatureBytes(ex, "image/format"))
+		colorspace := string(terf.ExampleFeatureBytes(ex, "image/colorspace"))
 		sourceID := terf.ExampleFeatureInt64(ex, "image/class/source")
 
 		stats.Total++
@@ -225,6 +249,8 @@ func fileSummary(inputPath string, compress bool) (*Stats, error) {
 		stats.LabelID[labelID]++
 		stats.LabelRaw[labelRaw]++
 		stats.Source[sourceID]++
+		stats.Format[format]++
+		stats.Colorspace[colorspace]++
 	}
 
 	return stats, nil
