@@ -139,9 +139,12 @@ Extract the raw image data from a dataset::
 Go
 ~~~~~~~~~~~~~~~~~~~~~~
 
-Parse TFRecords file in Go::
+Parse TFRecords file in Go:
 
-	in, err := os.Open("train-00001-of-01024")
+.. code-block:: go
+
+	// Open TFRecord file
+	in, err := os.Open("train-000")
 	if err != nil {
 		log.Fatal(err)
 	}
@@ -149,7 +152,9 @@ Parse TFRecords file in Go::
 
 	r := terf.NewReader(in)
 
+	count := 0
 	for {
+		// example will be a Tensorflow Example proto
 		example, err := r.Next()
 		if err == io.EOF {
 			break
@@ -158,7 +163,16 @@ Parse TFRecords file in Go::
 		}
 
 		// Do something with example
+
+		id := terf.ExampleFeatureInt64(example, "image/id")
+		labelID := terf.ExampleFeatureInt64(example, "image/class/label")
+		labelText := string(terf.ExampleFeatureBytes(example, "image/class/text"))
+
+		fmt.Printf("Image: %d Label: %s (%d)\n", id, labelText, labelID)
+		count++
 	}
+
+	fmt.Printf("Total records: %d\n", count)
 
 -------------------------------------------------------------------------------
 License
