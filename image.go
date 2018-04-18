@@ -22,7 +22,7 @@ import (
 	"errors"
 	"fmt"
 	"image"
-	"image/color"
+	"image/draw"
 	"image/jpeg"
 	"io"
 	"os"
@@ -69,24 +69,6 @@ type Image struct {
 
 	// Base filename of the original image
 	Filename string
-}
-
-// RGBImage is a JPEG encoded image in the RGB colorspace. This wraps
-// image.Image and ensures the image will be decoded using NRGBAModel
-type RGBImage struct {
-	img image.Image
-}
-
-func (i *RGBImage) ColorModel() color.Model {
-	return color.NRGBAModel
-}
-
-func (i *RGBImage) Bounds() image.Rectangle {
-	return i.img.Bounds()
-}
-
-func (i *RGBImage) At(x, y int) color.Color {
-	return color.NRGBAModel.Convert(i.img.At(x, y))
 }
 
 // Int64Feature is a helper function for encoding Tensorflow Example proto
@@ -350,8 +332,12 @@ func (i *Image) UnmarshalExample(example *protobuf.Example) error {
 func (i *Image) MarshalExample() (*protobuf.Example, error) {
 
 	// Convert image to RGB JPEG
+	b := i.Bounds()
+	im := image.NewRGBA(image.Rect(0, 0, b.Dx(), b.Dy()))
+	draw.Draw(im, im.Bounds(), i, b.Min, draw.Src)
+
 	buf := new(bytes.Buffer)
-	err := jpeg.Encode(buf, &RGBImage{i}, nil)
+	err := jpeg.Encode(buf, im, nil)
 	if err != nil {
 		return nil, err
 	}
