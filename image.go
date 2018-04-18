@@ -18,7 +18,6 @@
 package terf
 
 import (
-	"bufio"
 	"bytes"
 	"errors"
 	"fmt"
@@ -390,8 +389,5 @@ func (i *Image) Save(file string) error {
 	}
 	defer out.Close()
 
-	bufout := bufio.NewWriter(out)
-	defer bufout.Flush()
-
-	return jpeg.Encode(bufout, i, nil)
+	return i.Write(out)
 }
