@@ -22,6 +22,7 @@ import (
 	"errors"
 	"hash/crc32"
 	"io"
+	"bufio"
 
 	"github.com/golang/protobuf/proto"
 	protobuf "github.com/ubccr/terf/protobuf"
@@ -29,12 +30,14 @@ import (
 
 // Reader implements a reader for TFRecords with Example protos
 type Reader struct {
-	reader io.Reader
+	reader *bufio.Reader
 }
 
 // NewReader returns a new Reader
 func NewReader(r io.Reader) *Reader {
-	return &Reader{reader: r}
+	return &Reader{
+        reader: bufio.NewReader(r),
+    }
 }
 
 // Verify checksum

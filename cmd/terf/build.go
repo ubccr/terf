@@ -57,12 +57,13 @@ func (s *Shard) Next() *Shard {
 }
 
 func lineCounter(r io.Reader) (int, error) {
+	reader := bufio.NewReader(r)
 	buf := make([]byte, 32*1024)
 	count := 0
 	lineSep := []byte{'\n'}
 
 	for {
-		c, err := r.Read(buf)
+		c, err := reader.Read(buf)
 		count += bytes.Count(buf[:c], lineSep)
 
 		switch {
@@ -113,9 +114,7 @@ func Build(infile, outdir, name string, numPerBatch, threads int, compress bool)
 	}
 	defer in.Close()
 
-	bufin := bufio.NewReader(in)
-
-	total, err := lineCounter(bufin)
+	total, err := lineCounter(in)
 	if err != nil {
 		return err
 	}
@@ -127,8 +126,7 @@ func Build(infile, outdir, name string, numPerBatch, threads int, compress bool)
 	}
 
 	in.Seek(0, 0)
-	bufin.Reset(in)
-	r := csv.NewReader(bufin)
+	r := csv.NewReader(in)
 
 	// Parse header info
 	header, err := r.Read()
@@ -230,18 +228,15 @@ func process(shard *Shard) error {
 	}
 	defer out.Close()
 
-	bufout := bufio.NewWriter(out)
-	defer bufout.Flush()
-
 	var w *terf.Writer
 
 	if shard.Compress {
-		zout := zlib.NewWriter(bufout)
+		zout := zlib.NewWriter(out)
 		defer zout.Close()
 
 		w = terf.NewWriter(zout)
 	} else {
-		w = terf.NewWriter(bufout)
+		w = terf.NewWriter(out)
 	}
 
 	for _, row := range shard.Records {
@@ -260,6 +255,11 @@ func process(shard *Shard) error {
 		if err != nil {
 			return err
 		}
+	}
+
+	w.Flush()
+	if err := w.Error(); err != nil {
+		return err
 	}
 
 	return nil

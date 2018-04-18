@@ -58,6 +58,11 @@ func TestRoundTrip(t *testing.T) {
 	}
 
 	w.Write(example)
+	w.Flush()
+
+	if err := w.Error(); err != nil {
+		t.Fatal(err)
+	}
 
 	origRaw := example.Features.Feature["image/encoded"].Kind.(*protobuf.Feature_BytesList).BytesList.Value[0]
 

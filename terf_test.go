@@ -18,7 +18,6 @@
 package terf_test
 
 import (
-	"bufio"
 	"compress/zlib"
 	"fmt"
 	"io"
@@ -36,12 +35,8 @@ func ExampleWriter() {
 	}
 	defer out.Close()
 
-	// Use buffered IO
-	bufout := bufio.NewWriter(out)
-	defer bufout.Flush()
-
 	// Create new terf Writer
-	w := terf.NewWriter(bufout)
+	w := terf.NewWriter(out)
 
 	// Read in image data from file
 	reader, err := os.Open("image.jpg")
@@ -67,6 +62,12 @@ func ExampleWriter() {
 	if err != nil {
 		log.Fatal(err)
 	}
+
+	// Write any buffered data to the underlying writer
+	w.Flush()
+	if err := w.Error(); err != nil {
+		log.Fatal(err)
+	}
 }
 
 func ExampleWriter_compressed() {
@@ -77,12 +78,8 @@ func ExampleWriter_compressed() {
 	}
 	defer out.Close()
 
-	// Use buffered IO
-	bufout := bufio.NewWriter(out)
-	defer bufout.Flush()
-
 	// Create zlib writer
-	zout := zlib.NewWriter(bufout)
+	zout := zlib.NewWriter(out)
 	defer zout.Close()
 
 	// Create new terf Writer
@@ -112,6 +109,12 @@ func ExampleWriter_compressed() {
 	if err != nil {
 		log.Fatal(err)
 	}
+
+	// Write any buffered data to the underlying writer
+	w.Flush()
+	if err := w.Error(); err != nil {
+		log.Fatal(err)
+	}
 }
 
 func ExampleReader() {
@@ -122,9 +125,7 @@ func ExampleReader() {
 	}
 	defer in.Close()
 
-	// Use buffered IO
-	bufin := bufio.NewReader(in)
-	r := terf.NewReader(bufin)
+	r := terf.NewReader(in)
 
 	count := 0
 	for {
@@ -157,11 +158,8 @@ func ExampleReader_compressed() {
 	}
 	defer in.Close()
 
-	// Use buffered IO
-	bufin := bufio.NewReader(in)
-
 	// Create new zlib Reader
-	zin, err := zlib.NewReader(bufin)
+	zin, err := zlib.NewReader(in)
 	if err != nil {
 		log.Fatal(err)
 	}

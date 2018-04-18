@@ -22,6 +22,7 @@ import (
 	"encoding/binary"
 	"hash/crc32"
 	"io"
+	"bufio"
 
 	"github.com/golang/protobuf/proto"
 	protobuf "github.com/ubccr/terf/protobuf"
@@ -37,18 +38,32 @@ var (
 
 // Writer implements a writer for TFRecords with Example protos
 type Writer struct {
-	writer io.Writer
+	writer *bufio.Writer
 }
 
 // NewWriter returns a new Writer
 func NewWriter(w io.Writer) *Writer {
-	return &Writer{writer: w}
+	return &Writer{
+        writer: bufio.NewWriter(w),
+    }
 }
 
 // Returns the masked CRC32C of data
 func (w *Writer) checksum(data []byte) uint32 {
 	crc := crc32.Checksum(data, crc32c)
 	return ((crc >> 15) | (crc << 17)) + kMaskDelta
+}
+
+// Error reports any error that has occurred during a previous Write or Flush.
+func (w *Writer) Error() error {
+	_, err := w.writer.Write(nil)
+	return err
+}
+
+// Flush writes any buffered data to the underlying io.Writer. To check if an
+// error occurred during the Flush, call Error. 
+func (w *Writer) Flush() {
+    w.writer.Flush()
 }
 
 // Write writes the Example in TFRecords format
