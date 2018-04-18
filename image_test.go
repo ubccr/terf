@@ -22,8 +22,6 @@ import (
 	"encoding/base64"
 	"io"
 	"testing"
-
-	protobuf "github.com/ubccr/terf/protobuf"
 )
 
 func TestRoundTrip(t *testing.T) {
@@ -64,7 +62,7 @@ func TestRoundTrip(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	origRaw := example.Features.Feature["image/encoded"].Kind.(*protobuf.Feature_BytesList).BytesList.Value[0]
+	origRaw := ExampleFeatureBytes(example, "image/encoded")
 
 	r := NewReader(bytes.NewReader(output.Bytes()))
 	for {
@@ -106,7 +104,7 @@ func TestRoundTrip(t *testing.T) {
 			t.Errorf("Incorrect height: got %d should be %d", img.Height, height)
 		}
 
-		rawData := ex.Features.Feature["image/encoded"].Kind.(*protobuf.Feature_BytesList).BytesList.Value[0]
+		rawData := ExampleFeatureBytes(ex, "image/encoded")
 		if bytes.Compare(origRaw, rawData) != 0 {
 			t.Errorf("Incorrect image data")
 		}
