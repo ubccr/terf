@@ -149,7 +149,7 @@ func Build(infile, outdir, name string, numPerBatch, threads int, compress, jpeg
 	}
 
 	g, ctx := errgroup.WithContext(context.TODO())
-	shards := make(chan *Shard)
+	shards := make(chan *Shard, total)
 
 	g.Go(func() error {
 		defer close(shards)

@@ -136,16 +136,16 @@ func Summary(inputPath string, threads int, compress bool) error {
 		return nil
 	}
 
+	files, err := ioutil.ReadDir(inputPath)
+	if err != nil {
+		return err
+	}
+
 	g, ctx := errgroup.WithContext(context.TODO())
-	paths := make(chan string)
+	paths := make(chan string, len(files))
 
 	g.Go(func() error {
 		defer close(paths)
-
-		files, err := ioutil.ReadDir(inputPath)
-		if err != nil {
-			return err
-		}
 
 		for _, f := range files {
 			if f.IsDir() {
@@ -161,7 +161,7 @@ func Summary(inputPath string, threads int, compress bool) error {
 		return nil
 	})
 
-	stats := make(chan *Stats)
+	stats := make(chan *Stats, len(files))
 
 	for i := 0; i < threads; i++ {
 		g.Go(func() error {
