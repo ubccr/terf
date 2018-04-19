@@ -1,20 +1,21 @@
 ===============================================================================
-terf - Tensorflow TFRecords file format Reader/Writer
+terf - TensorFlow TFRecords file format Reader/Writer
 ===============================================================================
 
 |godoc|
 
-terf is a Go library for reading/writing Tensorflow TFRecord files. The goals
-of this project are two fold:
+terf is a Go library for reading/writing TensorFlow `TFRecords files
+<https://www.tensorflow.org/versions/r1.1/api_guides/python/python_io#tfrecords_format_details>`_.
+The goals of this project are two fold:
 
-1. Read/Write Tensorflow TFRecord files in Go
-2. Provide an easy way to generate example image datasets for use in Tensorflow
+1. Read/Write TensorFlow TFRecords files in Go
+2. Provide an easy way to generate example image datasets for use in TensorFlow
 
 With terf you can easily build, inspect, and extract image datasets from the
-command line without having to install Tensorflow. terf was developed for use
+command line without having to install TensorFlow. terf was developed for use
 with `MARCO <https://marco.ccr.buffalo.edu>`_ but should work with most image
-datasets. The TFRecord file format is based on the imagenet dataset from the
-inception research model in Tensorflow.
+datasets. The TFRecords file format is based on the imagenet dataset from the
+inception research model in TensorFlow.
 
 -------------------------------------------------------------------------------
 Install
@@ -35,7 +36,7 @@ Create an image dataset
 ~~~~~~~~~~~~~~~~~~~~~~~~~
 
 You have a directory of images that have been labeled and you want to build an
-image dataset that can be used in Tensorflow. First step is to generate a CSV
+image dataset that can be used in TensorFlow. First step is to generate a CSV
 file in the following format::
 
 	image_path,image_id,label_id,label_text,label_raw,source
@@ -55,7 +56,7 @@ To build the image dataset run the following command::
 
 	$ ./terf -d build --input images.csv --output train_directory/ --size 1024	
 
-This will convert the image data into a sharded data set of TFRecord files in
+This will convert the image data into a sharded data set of TFRecords files in
 the train/ output directory::
 	
 	train_directory/train-00000-of-00024
@@ -154,7 +155,7 @@ Parse TFRecords file in Go:
 
 	count := 0
 	for {
-		// example will be a Tensorflow Example proto
+		// example will be a TensorFlow Example proto
 		example, err := r.Next()
 		if err == io.EOF {
 			break

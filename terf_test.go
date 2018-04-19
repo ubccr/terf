@@ -129,7 +129,7 @@ func ExampleReader() {
 
 	count := 0
 	for {
-		// example will be a Tensorflow Example proto
+		// example will be a TensorFlow Example proto
 		example, err := r.Next()
 		if err == io.EOF {
 			break
@@ -169,7 +169,7 @@ func ExampleReader_compressed() {
 
 	count := 0
 	for {
-		// example will be a Tensorflow Example proto
+		// example will be a TensorFlow Example proto
 		example, err := r.Next()
 		if err == io.EOF {
 			break

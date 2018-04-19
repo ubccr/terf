@@ -37,7 +37,7 @@ import (
 	_ "image/png"
 )
 
-// Image is an Example image for training/validating in Tensorflow
+// Image is an Example image for training/validating in TensorFlow
 type Image struct {
 	// Unique ID for the image
 	ID int
@@ -74,7 +74,7 @@ type Image struct {
 	Raw []byte
 }
 
-// Int64Feature is a helper function for encoding Tensorflow Example proto
+// Int64Feature is a helper function for encoding TensorFlow Example proto
 // Int64 features
 func Int64Feature(val int64) *protobuf.Feature {
 	return &protobuf.Feature{
@@ -86,7 +86,7 @@ func Int64Feature(val int64) *protobuf.Feature {
 	}
 }
 
-// FloatFeature is a helper function for encoding Tensorflow Example proto
+// FloatFeature is a helper function for encoding TensorFlow Example proto
 // Float features
 func FloatFeature(val float32) *protobuf.Feature {
 	return &protobuf.Feature{
@@ -98,7 +98,7 @@ func FloatFeature(val float32) *protobuf.Feature {
 	}
 }
 
-// BytesFeature is a helper function for encoding Tensorflow Example proto
+// BytesFeature is a helper function for encoding TensorFlow Example proto
 // Bytes features
 func BytesFeature(val []byte) *protobuf.Feature {
 	return &protobuf.Feature{
@@ -111,7 +111,7 @@ func BytesFeature(val []byte) *protobuf.Feature {
 }
 
 // ExampleFeatureInt64 is a helper function for decoding proto Int64 feature
-// from a Tensorflow Example. If key is not found it returns default value
+// from a TensorFlow Example. If key is not found it returns default value
 func ExampleFeatureInt64(example *protobuf.Example, key string) int {
 	// TODO: return error if key is not found?
 	f, ok := example.Features.Feature[key]
@@ -128,7 +128,7 @@ func ExampleFeatureInt64(example *protobuf.Example, key string) int {
 }
 
 // ExampleFeatureFloat is a helper function for decoding proto Float feature
-// from a Tensorflow Example. If key is not found it returns default value
+// from a TensorFlow Example. If key is not found it returns default value
 func ExampleFeatureFloat(example *protobuf.Example, key string) float64 {
 	// TODO: return error if key is not found?
 	f, ok := example.Features.Feature[key]
@@ -145,7 +145,7 @@ func ExampleFeatureFloat(example *protobuf.Example, key string) float64 {
 }
 
 // ExampleFeatureBytes is a helper function for decoding proto Bytes feature
-// from a Tensorflow Example. If key is not found it returns default value
+// from a TensorFlow Example. If key is not found it returns default value
 func ExampleFeatureBytes(example *protobuf.Example, key string) []byte {
 	// TODO: return error if key is not found?
 	f, ok := example.Features.Feature[key]
@@ -266,7 +266,7 @@ func (i *Image) MarshalCSV(baseDir string) []string {
 	}
 }
 
-// UnmarshalExample decodes data from a Tensorflow example proto into Image i.
+// UnmarshalExample decodes data from a TensorFlow example proto into Image i.
 // This is the inverse of MarshalExample.
 func (i *Image) UnmarshalExample(example *protobuf.Example) error {
 
@@ -285,7 +285,7 @@ func (i *Image) UnmarshalExample(example *protobuf.Example) error {
 	return nil
 }
 
-// MarshalExample converts the Image to a Tensorflow Example proto.
+// MarshalExample converts the Image to a TensorFlow Example proto.
 // The Example proto schema is as follows:
 //
 //  image/height: integer, image height in pixels
