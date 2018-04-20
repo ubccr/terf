@@ -2,6 +2,12 @@
 ChangeLog
 ===============================================================================
 
+`v0.0.3`_ (2018-04-20)
+---------------------------
+
+* Minor performance improvements
+* Documentation update
+
 `v0.0.2`_ (2018-04-18)
 ---------------------------
 
@@ -18,3 +24,4 @@ ChangeLog
 
 .. _v0.0.1: https://github.com/ubccr/terf/releases/tag/v0.0.1
 .. _v0.0.2: https://github.com/ubccr/terf/releases/tag/v0.0.2
+.. _v0.0.3: https://github.com/ubccr/terf/releases/tag/v0.0.3
